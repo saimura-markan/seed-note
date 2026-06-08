@@ -36,7 +36,7 @@ function DeadlineBadge({ level }) {
   return (
     <div className="flex items-center justify-center w-full px-4 py-2 rounded-xl text-sm font-medium border border-amber-200 text-amber-800"
       style={{ backgroundColor: '#FEF3C7' }}>
-      対応期限：<strong className="ml-1">{cfg.deadline}分以内</strong>
+      Lv.{level}「{cfg.label}」→ <strong className="ml-1">{cfg.deadline}分以内</strong>に対応が必要です
     </div>
   )
 }
@@ -92,7 +92,7 @@ export default function ComplaintNew() {
   const assigneeOptions = DEPARTMENTS[form.department] || []
 
   return (
-    <div className="min-h-screen px-6 py-6" style={{ backgroundColor: '#F5F0E8' }}>
+    <div className="min-h-screen bg-[#F5F0E8] px-6 py-6">
       <div className="max-w-2xl mx-auto pb-28">
         <button onClick={() => navigate(-1)}
           className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 mb-6 transition-colors">

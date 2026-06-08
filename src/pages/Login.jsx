@@ -30,6 +30,9 @@ export default function Login({ onLogin }) {
         <div className="absolute bottom-[-60px] right-[-60px] w-80 h-80 rounded-full bg-emerald-700/20" />
 
         <div className="relative z-10 text-center">
+          <span className="inline-block mb-6 px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide bg-emerald-700/40 text-emerald-100 border border-emerald-500/40">
+            組織学習のプラットフォーム
+          </span>
           <svg className="w-24 h-28 mx-auto mb-6" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
             <line x1="32" y1="54" x2="32" y2="32" stroke="white" strokeWidth="3" strokeLinecap="round"/>
             <ellipse cx="19" cy="26" rx="14" ry="9" transform="rotate(-15 19 26)" fill="white"/>

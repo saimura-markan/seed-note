@@ -273,10 +273,11 @@ export default function ComplaintDetail() {
 
         {/* 記録入力 */}
         <div className="flex gap-2">
-          <input value={contactInput} onChange={e => setContactInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleContactLog()}
-            className="flex-1 h-10 px-3 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
-            placeholder="連絡内容を入力（例：折り返しの了承をいただいた）" />
+          <textarea value={contactInput} onChange={e => setContactInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && e.shiftKey && handleContactLog()}
+            className="flex-1 px-3 py-2 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition resize-none"
+            rows={3}
+            placeholder="連絡内容を入力（例：折り返しの了承をいただいた）&#10;Shift+Enterで送信" />
           <button type="button" onClick={handleContactLog} disabled={saving || !contactInput.trim()}
             className="px-4 h-10 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold transition-colors disabled:opacity-40">
             記録する

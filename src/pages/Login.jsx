@@ -30,7 +30,11 @@ export default function Login({ onLogin }) {
         <div className="absolute bottom-[-60px] right-[-60px] w-80 h-80 rounded-full bg-emerald-700/20" />
 
         <div className="relative z-10 text-center">
-          <div className="text-7xl mb-6 select-none">🌱</div>
+          <svg className="w-16 h-16 mx-auto mb-6" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <line x1="32" y1="54" x2="32" y2="14" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+            <path d="M32 40 C20 38 14 26 20 16 C28 22 32 34 32 40Z" fill="white"/>
+            <path d="M32 40 C44 38 50 26 44 16 C36 22 32 34 32 40Z" fill="white"/>
+          </svg>
           <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">Seed Note</h1>
           <div className="w-12 h-0.5 bg-emerald-400 mx-auto mb-8 rounded-full" />
           <p className="text-emerald-200 text-xl font-medium mb-3 leading-relaxed">
@@ -43,11 +47,15 @@ export default function Login({ onLogin }) {
       </div>
 
       {/* 右パネル：クリーム背景 */}
-      <div className="w-full md:w-1/2 flex items-center justify-center bg-[#F5F0E8] px-8">
+      <div className="w-full md:w-1/2 flex items-center justify-center px-8" style={{ backgroundColor: '#F5F0E8' }}>
         <div className="w-full max-w-sm">
           {/* モバイル時のロゴ */}
           <div className="md:hidden text-center mb-8">
-            <span className="text-4xl">🌱</span>
+            <svg className="w-12 h-12 mx-auto" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <line x1="32" y1="54" x2="32" y2="14" stroke="#065f46" strokeWidth="3" strokeLinecap="round"/>
+              <path d="M32 40 C20 38 14 26 20 16 C28 22 32 34 32 40Z" fill="#065f46"/>
+              <path d="M32 40 C44 38 50 26 44 16 C36 22 32 34 32 40Z" fill="#065f46"/>
+            </svg>
             <h1 className="text-2xl font-bold text-emerald-800 mt-2">Seed Note</h1>
           </div>
 

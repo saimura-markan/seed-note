@@ -42,8 +42,8 @@ export default function Login({ onLogin }) {
         </div>
       </div>
 
-      {/* 右パネル：白背景 */}
-      <div className="w-full md:w-1/2 flex items-center justify-center bg-white px-8">
+      {/* 右パネル：クリーム背景 */}
+      <div className="w-full md:w-1/2 flex items-center justify-center bg-[#F5F0E8] px-8">
         <div className="w-full max-w-sm">
           {/* モバイル時のロゴ */}
           <div className="md:hidden text-center mb-8">
@@ -66,7 +66,7 @@ export default function Login({ onLogin }) {
                 onKeyDown={handleKeyDown}
                 autoComplete="email"
                 placeholder="you@example.com"
-                className="w-full h-11 px-4 rounded-lg border border-gray-200 text-sm text-gray-900 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+                className="w-full h-11 px-4 rounded-lg border border-stone-200 bg-white text-sm text-gray-900 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
               />
             </div>
 
@@ -81,7 +81,7 @@ export default function Login({ onLogin }) {
                 onKeyDown={handleKeyDown}
                 autoComplete="current-password"
                 placeholder="••••••••"
-                className="w-full h-11 px-4 rounded-lg border border-gray-200 text-sm text-gray-900 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+                className="w-full h-11 px-4 rounded-lg border border-stone-200 bg-white text-sm text-gray-900 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
               />
             </div>
 

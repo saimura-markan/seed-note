@@ -9,6 +9,7 @@ import ComplaintDetail from './pages/ComplaintDetail'
 import CorrectionSubmit from './pages/CorrectionSubmit'
 import DeepAnalysis from './pages/DeepAnalysis'
 import Approval from './pages/Approval'
+import MyPage from './pages/MyPage'
 
 export default function App() {
   const [user, setUser] = useState(undefined)
@@ -55,6 +56,7 @@ export default function App() {
           <Route path="complaints/:id/correction" element={<CorrectionSubmit />} />
           <Route path="complaints/:id/analysis" element={<DeepAnalysis />} />
           <Route path="complaints/:id/approval" element={<Approval />} />
+          <Route path="mypage" element={<MyPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

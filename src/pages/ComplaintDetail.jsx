@@ -136,6 +136,7 @@ export default function ComplaintDetail() {
   const [saving, setSaving]               = useState(false)
   const [loading, setLoading]             = useState(true)
   const [, setTick]                       = useState(0)
+  const [toast, setToast]                 = useState('')
 
   // 1秒ごとにタイマー更新
   useEffect(() => {
@@ -215,10 +216,24 @@ export default function ComplaintDetail() {
       status: '是正案提出',
     }).eq('id', id)
     setComplaint(c => ({ ...c, judgment: j, status: '是正案提出' }))
+    if (j === '手直し') {
+      setTimeout(() => navigate(`/complaints/${id}/correction`), 600)
+    }
+    // '事業責任者' は「上司に報告する」ボタンで対応
+  }
+
+  // 上司に報告
+  const handleReportToSupervisor = async () => {
+    setSaving(true)
+    await supabase.from('complaint_logs').insert({
+      complaint_id: id, type: 'report', content: '上司に報告しました',
+    })
+    setSaving(false)
+    setToast('上司に報告しました ✅')
     setTimeout(() => {
-      if (j === '手直し') navigate(`/complaints/${id}/correction`)
-      else navigate(`/complaints/${id}/correction`)
-    }, 600)
+      setToast('')
+      navigate(`/complaints/${id}`)
+    }, 2500)
   }
 
   if (loading) return (
@@ -237,6 +252,11 @@ export default function ComplaintDetail() {
 
   return (
     <div className="px-6 py-6 max-w-3xl mx-auto">
+      {toast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-emerald-600 text-white px-6 py-3 rounded-xl shadow-lg text-sm font-bold">
+          {toast}
+        </div>
+      )}
       <button onClick={() => navigate('/dashboard')}
         className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 mb-5 transition-colors">
         <ArrowLeft size={15} /> ダッシュボードに戻る
@@ -332,14 +352,27 @@ export default function ComplaintDetail() {
               <span className="text-3xl">{j.icon}</span>
               <span className="font-bold text-gray-900 text-sm">{j.title}</span>
               <span className="text-xs text-gray-500">{j.desc}</span>
-              {judgment === j.key && (
+              {judgment === j.key && j.key === '手直し' && (
                 <span className="flex items-center gap-1 text-xs font-bold text-emerald-700 mt-1">
                   <ChevronRight size={12} /> 選択中 → 是正案提出へ
+                </span>
+              )}
+              {judgment === j.key && j.key === '事業責任者' && (
+                <span className="flex items-center gap-1 text-xs font-bold text-amber-700 mt-1">
+                  <ChevronRight size={12} /> 選択中
                 </span>
               )}
             </button>
           ))}
         </div>
+        {judgment === '事業責任者' && (
+          <div className="px-5 pb-5">
+            <button type="button" onClick={handleReportToSupervisor} disabled={saving}
+              className="w-full py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm transition-colors disabled:opacity-40">
+              上司に報告する
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -26,7 +26,7 @@ export default function App() {
 
   if (user === undefined) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f0ebe3]">
+      <div className="min-h-screen flex items-center justify-center bg-[#F5F0E8]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
       </div>
     )

@@ -13,7 +13,7 @@ export default function Layout({ user, onLogout }) {
   const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'ユーザー'
 
   return (
-    <div className="min-h-screen bg-[#f0ebe3]">
+    <div className="min-h-screen bg-[#F5F0E8]">
       <header className="bg-white border-b border-stone-200 px-6 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 bg-emerald-700 rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-sm">

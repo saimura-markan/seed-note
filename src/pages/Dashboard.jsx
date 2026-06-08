@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Sprout, CalendarDays, Clock, BarChart2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -34,23 +35,23 @@ const TAG_COLOR = {
 
 const STATUS_FILTERS = ['未対応', '受付済', '対応中', '改善策作成中', '承認待ち', '完了']
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-function buildMock(now) {
-  const ago = (min, sec = 0) => now - (min * 60 + sec) * 1000
-  return [
-    { id:'1', priority:3, company:'山田工務店',     site:'桜台レジデンス',      tag:'遅刻',       assignee:'佐藤 美咲', worker:'中村', deadlineMinutes:60, receivedAt:ago(72,13), status:'受付済',      isMine:false },
-    { id:'2', priority:4, company:'グリーンホーム',  site:'緑ヶ丘小学校',        tag:'その他',     assignee:'高橋 由紀', worker:'藤本', deadlineMinutes:30, receivedAt:ago(28,14), status:'対応中',      isMine:false },
-    { id:'3', priority:5, company:'株式会社みどり建設', site:'本社ビル B棟',     tag:'施工不備',   assignee:'田中 健太', worker:'大林', deadlineMinutes:15, receivedAt:ago(12,14), status:'対応中',      isMine:true  },
-    { id:'4', priority:5, company:'株式会社大成',    site:'駅前再開発 C街区',    tag:'施工不備',   assignee:'田中 健太', worker:'井上', deadlineMinutes:15, receivedAt:ago(6,14),  status:'改善策作成中', isMine:true  },
-    { id:'5', priority:4, company:'サンライズ開発',  site:'中央公園 整備工事',   tag:'近隣トラブル', assignee:'田中 健太', worker:'斎藤', deadlineMinutes:30, receivedAt:ago(11,14), status:'改善策作成中', isMine:true  },
-    { id:'6', priority:2, company:'北日本建設',      site:'グランドール東',      tag:'破損',       assignee:'鈴木 一郎', worker:'森',   deadlineMinutes:60, receivedAt:ago(24,18), status:'承認待ち',    isMine:false },
-    { id:'7', priority:1, company:'みなと開発',      site:'港南倉庫 A棟',        tag:'マナー',     assignee:'田中 健太', worker:'岡田', deadlineMinutes:60, receivedAt:ago(6,18),  status:'受付済',      isMine:true  },
-    { id:'8', priority:3, company:'東京建設',        site:'渋谷オフィスビル',    tag:'その他',     assignee:'佐藤 美咲', worker:'田村', deadlineMinutes:60, receivedAt:ago(80),    status:'完了',        isMine:false },
-  ]
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function mapRow(row) {
+  return {
+    id:              row.id,
+    priority:        row.emotion_level ?? 3,
+    company:         row.client_name   ?? '',
+    site:            row.site_name     ?? '',
+    tag:             row.category      ?? '',
+    assignee:        row.assignee      ?? '',
+    worker:          row.worker_name   ?? '',
+    deadlineMinutes: row.deadline_minutes ?? 60,
+    receivedAt:      new Date(row.received_at).getTime(),
+    status:          row.status        ?? '受付済',
+    isMine:          false,
+  }
+}
 
 const pad = n => String(Math.floor(Math.abs(n))).padStart(2, '0')
 
@@ -162,11 +163,27 @@ function ComplaintCard({ c, onClick }) {
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const baseTime = useRef(Date.now())
-  const complaints = useMemo(() => buildMock(baseTime.current), [])
+  const [complaints, setComplaints] = useState([])
+  const [loading, setLoading] = useState(true)
   const [, setTick] = useState(0)
   const [tab, setTab] = useState('all')
   const [statusFilter, setStatusFilter] = useState('未対応')
+
+  useEffect(() => {
+    const fetch = async () => {
+      const { data, error } = await supabase
+        .from('complaints')
+        .select('*')
+        .order('received_at', { ascending: false })
+      if (error) {
+        console.error('[Dashboard] complaints fetch error:', error)
+      } else {
+        setComplaints((data ?? []).map(mapRow))
+      }
+      setLoading(false)
+    }
+    fetch()
+  }, [])
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 1000)
@@ -177,12 +194,24 @@ export default function Dashboard() {
 
   const overdue = complaints.filter(c => calcTimer(c.receivedAt, c.deadlineMinutes).overdue)
 
+  const todayStr   = new Date().toDateString()
+  const now        = new Date()
+  const thisMonth  = now.getMonth()
+  const thisYear   = now.getFullYear()
+  const lastMonth  = thisMonth === 0 ? 11 : thisMonth - 1
+  const lastYear   = thisMonth === 0 ? thisYear - 1 : thisYear
+
+  const todayCount    = complaints.filter(c => new Date(c.receivedAt).toDateString() === todayStr).length
+  const thisMonthCount= complaints.filter(c => { const d = new Date(c.receivedAt); return d.getFullYear() === thisYear  && d.getMonth() === thisMonth }).length
+  const lastMonthCount= complaints.filter(c => { const d = new Date(c.receivedAt); return d.getFullYear() === lastYear  && d.getMonth() === lastMonth }).length
+  const monthDiff     = thisMonthCount - lastMonthCount
+
   const stats = [
-    { label: '未対応クレーム',    value: complaints.filter(c => c.status !== '完了').length, sub: '完了を除く全件',       icon: Sprout,      iconBg: 'bg-emerald-100', iconColor: 'text-emerald-700' },
-    { label: '本日の受付件数',    value: 8,                                                    sub: `${today}時点`,       icon: CalendarDays, iconBg: 'bg-blue-100',    iconColor: 'text-blue-600' },
-    { label: '期限超過',          value: overdue.length,                                       sub: '即時フォローが必要', icon: Clock,        iconBg: 'bg-red-100',     iconColor: 'text-red-600', valueColor: 'text-red-600' },
-    { label: '今月のクレーム件数', value: 34,                                                   sub: '先月比 -7件',        icon: BarChart2,    iconBg: 'bg-orange-100',  iconColor: 'text-orange-600' },
-    { label: '先月のクレーム件数', value: 41,                                                   sub: '比較対象',           icon: BarChart2,    iconBg: 'bg-stone-100',   iconColor: 'text-stone-500' },
+    { label: '未対応クレーム',    value: complaints.filter(c => c.status !== '完了').length, sub: '完了を除く全件',                                          icon: Sprout,      iconBg: 'bg-emerald-100', iconColor: 'text-emerald-700' },
+    { label: '本日の受付件数',    value: todayCount,                                          sub: `${today}時点`,                                           icon: CalendarDays, iconBg: 'bg-blue-100',    iconColor: 'text-blue-600' },
+    { label: '期限超過',          value: overdue.length,                                      sub: '即時フォローが必要',                                      icon: Clock,        iconBg: 'bg-red-100',     iconColor: 'text-red-600', valueColor: 'text-red-600' },
+    { label: '今月のクレーム件数', value: thisMonthCount,                                     sub: monthDiff === 0 ? '先月比 ±0件' : `先月比 ${monthDiff > 0 ? '+' : ''}${monthDiff}件`, icon: BarChart2, iconBg: 'bg-orange-100', iconColor: 'text-orange-600' },
+    { label: '先月のクレーム件数', value: lastMonthCount,                                     sub: '比較対象',                                               icon: BarChart2,    iconBg: 'bg-stone-100',   iconColor: 'text-stone-500' },
   ]
 
   const tabFiltered =
@@ -203,6 +232,14 @@ export default function Dashboard() {
     { id: 'mine',  label: '自分の担当',      count: complaints.filter(c => c.isMine).length },
     { id: 'staff', label: '全スタッフのクレーム一覧', count: null },
   ]
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[40vh]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+      </div>
+    )
+  }
 
   return (
     <div className="px-6 py-6 max-w-6xl mx-auto">

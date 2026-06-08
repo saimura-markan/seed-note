@@ -6,6 +6,9 @@ import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import ComplaintNew from './pages/ComplaintNew'
 import ComplaintDetail from './pages/ComplaintDetail'
+import CorrectionSubmit from './pages/CorrectionSubmit'
+import DeepAnalysis from './pages/DeepAnalysis'
+import Approval from './pages/Approval'
 
 export default function App() {
   const [user, setUser] = useState(undefined)
@@ -49,6 +52,9 @@ export default function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="complaints/new" element={<ComplaintNew />} />
           <Route path="complaints/:id" element={<ComplaintDetail />} />
+          <Route path="complaints/:id/correction" element={<CorrectionSubmit />} />
+          <Route path="complaints/:id/analysis" element={<DeepAnalysis />} />
+          <Route path="complaints/:id/approval" element={<Approval />} />
         </Route>
       </Routes>
     </BrowserRouter>

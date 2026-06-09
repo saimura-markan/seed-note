@@ -77,6 +77,12 @@ export default function DeepAnalysis() {
 
   const [submitting, setSubmitting]   = useState(false)
   const [loading,    setLoading]      = useState(true)
+  const [, setTick]                   = useState(0)
+
+  useEffect(() => {
+    const t = setInterval(() => setTick(n => n + 1), 1000)
+    return () => clearInterval(t)
+  }, [])
 
   const fetchData = useCallback(async () => {
     const [{ data: c }, { data: logs }, { data: corr }, { data: deep }] = await Promise.all([
@@ -165,6 +171,47 @@ export default function DeepAnalysis() {
       </button>
 
       <ProgressBar status="深掘り提出" />
+
+      {/* 24時間カウントダウンタイマー */}
+      {complaint.supervisor_reported_at && (() => {
+        const deadline = new Date(complaint.supervisor_reported_at).getTime() + 24 * 60 * 60 * 1000
+        const remaining = Math.floor((deadline - Date.now()) / 1000)
+        const pad = n => String(Math.floor(Math.abs(n))).padStart(2, '0')
+
+        if (remaining <= 0) {
+          const over = -remaining
+          return (
+            <div className="flex items-center gap-3 bg-red-50 border border-red-300 rounded-2xl px-5 py-3 mb-5">
+              <AlertTriangle size={16} className="text-red-600 shrink-0" />
+              <span className="text-xs font-semibold text-red-700">提出期限</span>
+              <span className="text-lg font-black tabular-nums text-red-700">
+                期限超過 +{pad(over / 3600)}:{pad((over % 3600) / 60)}:{pad(over % 60)}
+              </span>
+            </div>
+          )
+        }
+
+        const h = pad(remaining / 3600)
+        const m = pad((remaining % 3600) / 60)
+        const s = pad(remaining % 60)
+        const isRed    = remaining < 6 * 3600
+        const isOrange = !isRed && remaining < 12 * 3600
+
+        const bg     = isRed ? 'bg-red-50 border-red-300'       : isOrange ? 'bg-orange-50 border-orange-300'  : 'bg-amber-50 border-amber-200'
+        const label  = isRed ? 'text-red-700'                   : isOrange ? 'text-orange-700'                 : 'text-amber-700'
+        const value  = isRed ? 'text-red-700'                   : isOrange ? 'text-orange-800'                 : 'text-amber-800'
+        const icon   = isRed ? <AlertTriangle size={16} className="text-red-600 shrink-0" /> : null
+
+        return (
+          <div className={`flex items-center gap-3 border rounded-2xl px-5 py-3 mb-5 ${bg}`}>
+            {icon}
+            <span className={`text-xs font-semibold ${label}`}>
+              {isRed ? '⚠️ 残り時間わずか' : isOrange ? '注意：残り時間' : '提出期限まで'}
+            </span>
+            <span className={`text-lg font-black tabular-nums ${value}`}>残り {h}:{m}:{s}</span>
+          </div>
+        )
+      })()}
 
       {/* ヘッダー */}
       <div className="bg-white rounded-2xl shadow-sm p-5 mb-5">

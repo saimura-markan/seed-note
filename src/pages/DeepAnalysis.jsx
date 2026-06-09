@@ -75,6 +75,8 @@ export default function DeepAnalysis() {
   const [orgImprove,  setOrgImprove]  = useState('')
   const [rootTheme,   setRootTheme]   = useState('')
 
+  const [supervisorComment, setSupervisorComment] = useState('')
+  const [approving,  setApproving]    = useState(false)
   const [submitting, setSubmitting]   = useState(false)
   const [loading,    setLoading]      = useState(true)
   const [, setTick]                   = useState(0)
@@ -91,7 +93,7 @@ export default function DeepAnalysis() {
       supabase.from('complaint_corrections').select('*').eq('complaint_id', id).order('created_at').limit(1),
       supabase.from('complaint_deep_analysis').select('*').eq('complaint_id', id).order('created_at').limit(1),
     ])
-    if (c) setComplaint(c)
+    if (c) { setComplaint(c); setSupervisorComment(c.supervisor_comment || '') }
     if (logs) {
       setContactLogs(logs.filter(l => l.type === 'contact'))
       const h = logs.filter(l => l.type === 'hearing').pop()
@@ -109,6 +111,34 @@ export default function DeepAnalysis() {
   }, [id])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  // 承認
+  const handleApprove = async () => {
+    setApproving(true)
+    const now = new Date().toISOString()
+    await supabase.from('complaints').update({
+      status: '是正案承認',
+      supervisor_approved_at: now,
+      supervisor_comment: supervisorComment,
+    }).eq('id', id)
+    setComplaint(c => ({ ...c, status: '是正案承認', supervisor_approved_at: now, supervisor_comment: supervisorComment }))
+    setApproving(false)
+  }
+
+  // 否認（差し戻し）
+  const handleReject = async () => {
+    if (!supervisorComment.trim()) {
+      alert('差し戻しコメントを入力してください')
+      return
+    }
+    setApproving(true)
+    await supabase.from('complaints').update({
+      status: '是正案差し戻し',
+      supervisor_comment: supervisorComment,
+    }).eq('id', id)
+    setComplaint(c => ({ ...c, status: '是正案差し戻し', supervisor_comment: supervisorComment }))
+    setApproving(false)
+  }
 
   const canSubmit = rootCause.trim() && horizontal.trim() && orgImprove.trim() && rootTheme
 
@@ -143,7 +173,7 @@ export default function DeepAnalysis() {
       )
     }
 
-    await supabase.from('complaints').update({ status: '承認完了' }).eq('id', id)
+    await supabase.from('complaints').update({ status: '深掘り提出' }).eq('id', id)
     setSubmitting(false)
     navigate(`/complaints/${id}/approval`)
   }
@@ -258,65 +288,110 @@ export default function DeepAnalysis() {
         </div>
       </div>
 
-      {/* ② 深掘り分析（入力） */}
-      <div className="bg-white rounded-2xl shadow-sm mb-4 p-5 space-y-4">
-        <p className="text-sm font-bold text-gray-800">② 深掘り分析</p>
-
-        <div>
-          <label className={labelCls}>真因 <span className="text-red-500">*</span></label>
-          <p className={guideCls}>なぜこの問題が起きたのか？組織・仕組みの観点から一言で</p>
-          <textarea value={rootCause} onChange={e => setRootCause(e.target.value)}
-            rows={3} placeholder="例：現場確認の責任者が明確でなく、個人の判断に委ねられていた"
-            className={taCls} />
+      {/* ② 承認/否認 */}
+      {['是正案提出', '是正案差し戻し'].includes(complaint.status) && (
+        <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-stone-100">
+            <span className="text-sm font-bold text-gray-800">② 是正案の承認・否認</span>
+          </div>
+          <div className="p-5 space-y-3">
+            <div>
+              <label className={labelCls}>コメント（否認の場合は必須）</label>
+              <textarea value={supervisorComment} onChange={e => setSupervisorComment(e.target.value)}
+                rows={3} placeholder="承認・否認の理由やフィードバックを記入してください"
+                className={taCls} />
+            </div>
+            <div className="flex gap-3">
+              <button type="button" onClick={handleReject} disabled={approving}
+                className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm transition-colors disabled:opacity-40">
+                {approving ? '処理中...' : '否認（差し戻し）'}
+              </button>
+              <button type="button" onClick={handleApprove} disabled={approving}
+                className="flex-1 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm transition-colors disabled:opacity-40">
+                {approving ? '処理中...' : '承認'}
+              </button>
+            </div>
+          </div>
         </div>
+      )}
 
-        <div>
-          <label className={labelCls}>横展開 <span className="text-red-500">*</span></label>
-          <p className={guideCls}>他部署でも同じことが起きるとしたらどこか？</p>
-          <textarea value={horizontal} onChange={e => setHorizontal(e.target.value)}
-            rows={3} placeholder="例：産廃部門でも搬入前確認のチェックが属人化している可能性がある"
-            className={taCls} />
+      {complaint.status === '是正案承認' && (
+        <div className="bg-green-50 border border-green-200 rounded-2xl px-5 py-4 mb-4 flex items-center gap-2">
+          <span className="text-green-700 font-bold text-sm">✅ 是正案を承認済み</span>
+          {complaint.supervisor_comment && (
+            <span className="text-xs text-green-600">— {complaint.supervisor_comment}</span>
+          )}
         </div>
+      )}
 
-        <div>
-          <label className={labelCls}>組織改善案 <span className="text-red-500">*</span></label>
-          <p className={guideCls}>会社として何を変えるか？</p>
-          <textarea value={orgImprove} onChange={e => setOrgImprove(e.target.value)}
-            rows={3} placeholder="例：全部署共通の作業前チェックリストを策定し、月次で見直す体制を設ける"
-            className={taCls} />
-        </div>
-      </div>
+      {/* ③ 深掘り分析（改善報告書提出後のみ） */}
+      {complaint.status === '改善報告書提出' && (
+        <>
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-4">
+            <p className="text-sm font-semibold text-blue-800">📋 改善報告書が提出されました。深掘り分析を行ってください。</p>
+            {complaint.improvement_report && (
+              <div className="mt-2 bg-white rounded-xl px-4 py-3 text-sm text-gray-700 border border-blue-100">
+                <p className="text-xs font-semibold text-blue-600 mb-1">管理者の改善報告書</p>
+                <p className="leading-relaxed">{complaint.improvement_report}</p>
+              </div>
+            )}
+          </div>
 
-      {/* ③ 根源テーマ分類 */}
-      <div className="bg-white rounded-2xl shadow-sm mb-5 p-5">
-        <label className={labelCls}>③ 根源テーマの分類 <span className="text-red-500">*</span></label>
-        <div className="flex flex-wrap gap-2 mt-2">
-          {ROOT_THEMES.map(theme => (
-            <button key={theme} type="button"
-              onClick={() => setRootTheme(theme)}
-              className={cn(
-                'px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all',
-                rootTheme === theme
-                  ? 'bg-emerald-700 text-white border-emerald-700'
-                  : 'bg-white text-gray-600 border-stone-200 hover:border-emerald-300 hover:bg-emerald-50'
-              )}>
-              {theme}
+          <div className="bg-white rounded-2xl shadow-sm mb-4 p-5 space-y-4">
+            <p className="text-sm font-bold text-gray-800">③ 深掘り分析</p>
+            <div>
+              <label className={labelCls}>真因 <span className="text-red-500">*</span></label>
+              <p className={guideCls}>なぜこの問題が起きたのか？組織・仕組みの観点から一言で</p>
+              <textarea value={rootCause} onChange={e => setRootCause(e.target.value)}
+                rows={3} placeholder="例：現場確認の責任者が明確でなく、個人の判断に委ねられていた"
+                className={taCls} />
+            </div>
+            <div>
+              <label className={labelCls}>横展開 <span className="text-red-500">*</span></label>
+              <p className={guideCls}>他部署でも同じことが起きるとしたらどこか？</p>
+              <textarea value={horizontal} onChange={e => setHorizontal(e.target.value)}
+                rows={3} placeholder="例：産廃部門でも搬入前確認のチェックが属人化している可能性がある"
+                className={taCls} />
+            </div>
+            <div>
+              <label className={labelCls}>組織改善案 <span className="text-red-500">*</span></label>
+              <p className={guideCls}>会社として何を変えるか？</p>
+              <textarea value={orgImprove} onChange={e => setOrgImprove(e.target.value)}
+                rows={3} placeholder="例：全部署共通の作業前チェックリストを策定し、月次で見直す体制を設ける"
+                className={taCls} />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm mb-5 p-5">
+            <label className={labelCls}>④ 根源テーマの分類 <span className="text-red-500">*</span></label>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {ROOT_THEMES.map(theme => (
+                <button key={theme} type="button"
+                  onClick={() => setRootTheme(theme)}
+                  className={cn(
+                    'px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all',
+                    rootTheme === theme
+                      ? 'bg-emerald-700 text-white border-emerald-700'
+                      : 'bg-white text-gray-600 border-stone-200 hover:border-emerald-300 hover:bg-emerald-50'
+                  )}>
+                  {theme}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-3 pb-8">
+            <button type="button" onClick={handleClear}
+              className="px-5 h-12 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50 transition-colors">
+              クリア
             </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ボタン */}
-      <div className="flex gap-3 pb-8">
-        <button type="button" onClick={handleClear}
-          className="px-5 h-12 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50 transition-colors">
-          クリア
-        </button>
-        <button type="button" onClick={handleSubmit} disabled={submitting || !canSubmit}
-          className="flex-1 h-12 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
-          {submitting ? '送信中...' : '役員承認へ送付'}
-        </button>
-      </div>
+            <button type="button" onClick={handleSubmit} disabled={submitting || !canSubmit}
+              className="flex-1 h-12 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+              {submitting ? '送信中...' : '役員承認へ送付'}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }

@@ -6,7 +6,17 @@ import { supabase } from '@/lib/supabase'
 
 // ─── 定数 ───────────────────────────────────────────────────────────────────
 
-const STEPS = ['受付済', '対応中', '是正案提出', '深掘り提出', '承認完了']
+const STEPS = ['受付済', '対応中', '是正案', '改善報告', '深掘り', '承認完了']
+
+function statusToStep(status) {
+  const map = {
+    '受付済': 0, '対応中': 1,
+    '是正案提出': 2, '是正案差し戻し': 2,
+    '是正案承認': 3, '改善報告書提出': 3,
+    '深掘り提出': 4, '承認完了': 5,
+  }
+  return map[status] ?? 0
+}
 
 const PRIORITY = {
   5: { label: '最高緊張', bg: 'bg-red-100',    text: 'text-red-700',    border: 'border-l-red-400' },
@@ -38,7 +48,7 @@ function calcTimer(receivedAt, deadlineMinutes) {
 // ─── 進捗バー ─────────────────────────────────────────────────────────────────
 
 function ProgressBar({ status }) {
-  const step = STEPS.indexOf(status)
+  const step = statusToStep(status)
   return (
     <div className="bg-white rounded-2xl shadow-sm px-6 py-4 mb-5">
       <div className="flex items-center gap-0">
@@ -139,6 +149,7 @@ export default function ComplaintDetail() {
   const [toast, setToast]                 = useState('')
   const [plannedAt, setPlannedAt]         = useState('')
   const [supervisorNote, setSupervisorNote] = useState('')
+  const [improvementReport, setImprovementReport] = useState('')
 
   // 1秒ごとにタイマー更新
   useEffect(() => {
@@ -151,7 +162,7 @@ export default function ComplaintDetail() {
       supabase.from('complaints').select('*').eq('id', id).maybeSingle(),
       supabase.from('complaint_logs').select('*').eq('complaint_id', id).order('created_at'),
     ])
-    if (c) { setComplaint(c); setJudgment(c.judgment || null) }
+    if (c) { setComplaint(c); setJudgment(c.judgment || null); setImprovementReport(c.improvement_report || '') }
     if (logs) {
       setContactLogs(logs.filter(l => l.type === 'contact'))
       const h = logs.filter(l => l.type === 'hearing').pop()
@@ -246,6 +257,21 @@ export default function ComplaintDetail() {
       setToast('')
       navigate(`/complaints/${id}`)
     }, 2500)
+  }
+
+  // 改善報告書提出
+  const handleSubmitImprovementReport = async () => {
+    if (!improvementReport.trim()) return
+    setSaving(true)
+    await supabase.from('complaints').update({
+      improvement_report: improvementReport,
+      improvement_reported_at: new Date().toISOString(),
+      status: '改善報告書提出',
+    }).eq('id', id)
+    setComplaint(c => ({ ...c, improvement_report: improvementReport, status: '改善報告書提出' }))
+    setSaving(false)
+    setToast('改善報告書を提出しました ✅')
+    setTimeout(() => setToast(''), 2500)
   }
 
   if (loading) return (
@@ -409,6 +435,46 @@ export default function ComplaintDetail() {
           </div>
         )}
       </div>
+
+      {/* ④ 差し戻しセクション */}
+      {complaint.status === '是正案差し戻し' && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-5 mb-4">
+          <p className="text-sm font-bold text-red-700 mb-3">⚠️ 是正案が差し戻されました</p>
+          {complaint.supervisor_comment && (
+            <div className="bg-white rounded-xl px-4 py-3 text-sm text-gray-700 mb-4 border border-red-100">
+              <p className="text-xs font-semibold text-red-600 mb-1">事業責任者のコメント</p>
+              <p className="leading-relaxed">{complaint.supervisor_comment}</p>
+            </div>
+          )}
+          <button onClick={() => navigate(`/complaints/${id}/correction`)}
+            className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm transition-colors">
+            是正案を修正して再提出
+          </button>
+        </div>
+      )}
+
+      {/* ④ 改善報告書セクション */}
+      {complaint.status === '是正案承認' && (
+        <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-stone-100 bg-green-50">
+            <span className="text-sm font-bold text-green-800">✅ 是正案が承認されました</span>
+          </div>
+          <div className="p-5">
+            <p className="text-sm text-gray-600 mb-3">最終改善報告書を作成してください。</p>
+            <textarea
+              value={improvementReport}
+              onChange={e => setImprovementReport(e.target.value)}
+              rows={5}
+              placeholder="今回のクレーム対応を通じて、何を学び、今後どう活かすかを記述してください"
+              className="w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition resize-none mb-3"
+            />
+            <button onClick={handleSubmitImprovementReport} disabled={saving || !improvementReport.trim()}
+              className="w-full py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm transition-colors disabled:opacity-40">
+              改善報告書を提出する
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

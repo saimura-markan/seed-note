@@ -6,14 +6,26 @@ import { supabase } from '@/lib/supabase'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const STATUS_ORDER = ['受付済', '対応中', '是正案提出', '深掘り提出', '承認完了']
+const STATUS_ORDER = ['受付済', '対応中', '是正案提出', '是正案差し戻し', '是正案承認', '改善報告書提出', '深掘り提出', '承認完了']
+
+const STATUS_TO_STEP = {
+  '受付済':         0,
+  '対応中':         1,
+  '是正案提出':     2,
+  '是正案差し戻し': 2,
+  '是正案承認':     3,
+  '改善報告書提出': 3,
+  '深掘り提出':     4,
+  '承認完了':       5,
+}
 
 const STATUS_FLOW_STEPS = [
-  { label: '受付',       dotColor: 'bg-orange-500', textColor: 'text-orange-500', borderColor: 'border-l-orange-500' },
-  { label: 'STEP A',    dotColor: 'bg-amber-500',  textColor: 'text-amber-500',  borderColor: 'border-l-amber-500' },
-  { label: 'STEP B',    dotColor: 'bg-blue-500',   textColor: 'text-blue-500',   borderColor: 'border-l-blue-500' },
-  { label: '事業責任者', dotColor: 'bg-indigo-500', textColor: 'text-indigo-500', borderColor: 'border-l-indigo-500' },
-  { label: '役員承認',  dotColor: 'bg-purple-500', textColor: 'text-purple-500', borderColor: 'border-l-purple-500' },
+  { label: '受付',    dotColor: 'bg-orange-500', textColor: 'text-orange-500', borderColor: 'border-l-orange-500' },
+  { label: '対応中',  dotColor: 'bg-amber-500',  textColor: 'text-amber-500',  borderColor: 'border-l-amber-500' },
+  { label: '是正案',  dotColor: 'bg-blue-500',   textColor: 'text-blue-500',   borderColor: 'border-l-blue-500' },
+  { label: '改善報告', dotColor: 'bg-indigo-500', textColor: 'text-indigo-500', borderColor: 'border-l-indigo-500' },
+  { label: '深掘り',  dotColor: 'bg-purple-500', textColor: 'text-purple-500', borderColor: 'border-l-purple-500' },
+  { label: '承認',    dotColor: 'bg-emerald-500', textColor: 'text-emerald-500', borderColor: 'border-l-emerald-500' },
 ]
 
 const PRIORITY = {
@@ -25,11 +37,14 @@ const PRIORITY = {
 }
 
 const STATUS_BADGE = {
-  '受付済':     'bg-stone-100 text-stone-600 border border-stone-200',
-  '対応中':     'bg-stone-100 text-stone-600 border border-stone-200',
-  '是正案提出':  'bg-amber-100 text-amber-700 border border-amber-200',
-  '深掘り提出':  'bg-blue-100 text-blue-700 border border-blue-200',
-  '承認完了':    'bg-emerald-100 text-emerald-700 border border-emerald-200',
+  '受付済':         'bg-stone-100 text-stone-600 border border-stone-200',
+  '対応中':         'bg-stone-100 text-stone-600 border border-stone-200',
+  '是正案提出':     'bg-amber-100 text-amber-700 border border-amber-200',
+  '是正案差し戻し': 'bg-red-100 text-red-700 border border-red-200',
+  '是正案承認':     'bg-green-100 text-green-700 border border-green-200',
+  '改善報告書提出': 'bg-blue-100 text-blue-700 border border-blue-200',
+  '深掘り提出':     'bg-indigo-100 text-indigo-700 border border-indigo-200',
+  '承認完了':       'bg-emerald-100 text-emerald-700 border border-emerald-200',
 }
 
 const TAG_COLOR = {
@@ -41,7 +56,7 @@ const TAG_COLOR = {
   'マナー':     'bg-violet-50 text-violet-700',
 }
 
-const STATUS_FILTERS = ['未対応', '受付済', '対応中', '是正案提出', '深掘り提出', '承認完了']
+const STATUS_FILTERS = ['未対応', '受付済', '対応中', '是正案提出', '是正案差し戻し', '是正案承認', '改善報告書提出', '深掘り提出', '承認完了']
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -91,7 +106,7 @@ function StatCard({ label, value, sub, icon: Icon, iconBg, iconColor, valueColor
 }
 
 function StepProgressBar({ status }) {
-  const stepIndex = status === '承認完了' ? STATUS_FLOW_STEPS.length : STATUS_ORDER.indexOf(status)
+  const stepIndex = STATUS_TO_STEP[status] ?? 0
   return (
     <div className="mt-3">
       <div className="flex items-center">
@@ -187,7 +202,7 @@ function ComplaintCard({ c, onClick }) {
 }
 
 function StatusComplaintCard({ c, onClick }) {
-  const stepIndex  = STATUS_ORDER.indexOf(c.status)
+  const stepIndex  = STATUS_TO_STEP[c.status] ?? 0
   const step       = STATUS_FLOW_STEPS[stepIndex]
   const initials   = c.assignee ? c.assignee.charAt(0) : '?'
   const borderCls  = c.status === '承認完了' ? 'border-l-emerald-500' : step?.borderColor ?? 'border-l-stone-300'

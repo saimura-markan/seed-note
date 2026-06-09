@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Phone, PhoneOff, ClipboardList, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -151,10 +151,17 @@ export default function ComplaintDetail() {
   const [supervisorNote, setSupervisorNote] = useState('')
   const [improvementReport, setImprovementReport] = useState('')
 
+  const toastTimerRef = useRef(null)
+
   // 1秒ごとにタイマー更新
   useEffect(() => {
     const t = setInterval(() => setTick(n => n + 1), 1000)
     return () => clearInterval(t)
+  }, [])
+
+  // アンマウント時にトーストタイマーをクリア
+  useEffect(() => {
+    return () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current) }
   }, [])
 
   const fetchData = useCallback(async () => {
@@ -253,7 +260,7 @@ export default function ComplaintDetail() {
     setComplaint(c => ({ ...c, status: '是正案提出', supervisor_reported_at: reportedAt }))
     setSaving(false)
     setToast('上司に報告しました ✅')
-    setTimeout(() => {
+    toastTimerRef.current = setTimeout(() => {
       setToast('')
       navigate(`/complaints/${id}`)
     }, 2500)

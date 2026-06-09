@@ -11,6 +11,13 @@ import DeepAnalysis from './pages/DeepAnalysis'
 import Approval from './pages/Approval'
 import MyPage from './pages/MyPage'
 
+function RoleGuard({ user, allow, deny, children }) {
+  const role = user?.app_metadata?.role || 'user'
+  const blocked = deny ? deny.includes(role) : allow ? !allow.includes(role) : false
+  if (blocked) return <Navigate to="/dashboard" replace />
+  return children
+}
+
 export default function App() {
   const [user, setUser] = useState(undefined)
 
@@ -53,9 +60,15 @@ export default function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="complaints/new" element={<ComplaintNew />} />
           <Route path="complaints/:id" element={<ComplaintDetail />} />
-          <Route path="complaints/:id/correction" element={<CorrectionSubmit />} />
-          <Route path="complaints/:id/analysis" element={<DeepAnalysis />} />
-          <Route path="complaints/:id/approval" element={<Approval />} />
+          <Route path="complaints/:id/correction" element={
+            <RoleGuard user={user} allow={['admin']}><CorrectionSubmit /></RoleGuard>
+          } />
+          <Route path="complaints/:id/analysis" element={
+            <RoleGuard user={user} deny={['admin']}><DeepAnalysis /></RoleGuard>
+          } />
+          <Route path="complaints/:id/approval" element={
+            <RoleGuard user={user} allow={['judgment']}><Approval /></RoleGuard>
+          } />
           <Route path="mypage" element={<MyPage />} />
         </Route>
       </Routes>

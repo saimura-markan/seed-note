@@ -149,6 +149,7 @@ export default function ComplaintDetail() {
   const [toast, setToast]                 = useState('')
   const [plannedAt, setPlannedAt]         = useState('')
   const [supervisorNote, setSupervisorNote] = useState('')
+  const [reportLog, setReportLog]         = useState(null)
   const [improvementReport, setImprovementReport] = useState('')
 
   const toastTimerRef = useRef(null)
@@ -174,6 +175,8 @@ export default function ComplaintDetail() {
       setContactLogs(logs.filter(l => l.type === 'contact'))
       const h = logs.filter(l => l.type === 'hearing').pop()
       if (h) { setHearingLog(h); setHearingInput(h.content) }
+      const r = logs.filter(l => l.type === 'report').pop()
+      if (r) setReportLog(r)
     }
     setLoading(false)
   }, [id])
@@ -367,81 +370,115 @@ export default function ComplaintDetail() {
       </SectionCard>
 
       {/* ③ 対応判断 */}
-      <div className="bg-white rounded-2xl shadow-sm mb-8 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
         <div className="px-5 py-3.5 border-b border-stone-100">
           <span className="text-sm font-bold text-gray-800">③ 対応判断</span>
         </div>
-        <div className="p-5 grid grid-cols-2 gap-4">
-          {[
-            {
-              key: '手直し',
-              icon: '🔧',
-              title: '手直しで対応',
-              desc: '現場で是正する',
-              color: judgment === '手直し' ? 'ring-2 ring-emerald-400 border-emerald-300 bg-emerald-50' : 'border-stone-200 hover:border-emerald-300 hover:bg-emerald-50/50',
-            },
-            {
-              key: '事業責任者',
-              icon: '👤',
-              title: '事業責任者へ確認',
-              desc: '上司の指示を仰ぐ',
-              color: judgment === '事業責任者' ? 'ring-2 ring-amber-400 border-amber-300 bg-amber-50' : 'border-stone-200 hover:border-amber-300 hover:bg-amber-50/50',
-            },
-          ].map(j => (
-            <button key={j.key} type="button"
-              onClick={() => handleJudgment(j.key)}
-              className={cn(
-                'flex flex-col items-center gap-2 p-5 rounded-2xl border-2 transition-all cursor-pointer',
-                j.color
-              )}>
-              <span className="text-3xl">{j.icon}</span>
-              <span className="font-bold text-gray-900 text-sm">{j.title}</span>
-              <span className="text-xs text-gray-500">{j.desc}</span>
-              {judgment === j.key && (
-                <span className={cn(
-                  'flex items-center gap-1 text-xs font-bold mt-1',
-                  j.key === '手直し' ? 'text-emerald-700' : 'text-amber-700'
-                )}>
-                  <ChevronRight size={12} /> 選択中
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-        {judgment === '手直し' && (
-          <div className="px-5 pb-5 space-y-3">
-            <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1">手直し予定日時</label>
-              <input type="datetime-local" value={plannedAt} onChange={e => setPlannedAt(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition" />
+        {complaint.supervisor_reported_at ? (
+          <div className="p-5 space-y-3">
+            <div className={cn(
+              'inline-flex items-center gap-2 px-4 py-2 rounded-xl border-2 text-sm font-bold',
+              judgment === '手直し'
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                : 'bg-amber-50 border-amber-300 text-amber-800'
+            )}>
+              {judgment === '手直し' ? '🔧 手直しで対応' : '👤 事業責任者へ確認'}
             </div>
-            {plannedAt && (
-              <button type="button" onClick={handleReportToSupervisor} disabled={saving}
-                className="w-full py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm transition-colors disabled:opacity-40">
-                上司に報告する
-              </button>
+            {reportLog && (
+              <p className="text-sm text-gray-700 bg-stone-50 rounded-xl px-4 py-3 leading-relaxed">
+                {reportLog.content}
+              </p>
             )}
           </div>
-        )}
-        {judgment === '事業責任者' && (
-          <div className="px-5 pb-5 space-y-3">
-            <textarea
-              value={supervisorNote}
-              onChange={e => setSupervisorNote(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && e.shiftKey && supervisorNote.trim() && handleReportToSupervisor()}
-              rows={4}
-              className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 transition resize-none"
-              placeholder={`お客様のご意見と作業者への聞き取りを踏まえ、あなたはどうすべきだと思いますか？\nShift+Enterで送信`}
-            />
-            {supervisorNote.trim() && (
-              <button type="button" onClick={handleReportToSupervisor} disabled={saving}
-                className="w-full py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm transition-colors disabled:opacity-40">
-                上司に報告する
-              </button>
+        ) : (
+          <>
+            <div className="p-5 grid grid-cols-2 gap-4">
+              {[
+                {
+                  key: '手直し',
+                  icon: '🔧',
+                  title: '手直しで対応',
+                  desc: '現場で是正する',
+                  color: judgment === '手直し' ? 'ring-2 ring-emerald-400 border-emerald-300 bg-emerald-50' : 'border-stone-200 hover:border-emerald-300 hover:bg-emerald-50/50',
+                },
+                {
+                  key: '事業責任者',
+                  icon: '👤',
+                  title: '事業責任者へ確認',
+                  desc: '上司の指示を仰ぐ',
+                  color: judgment === '事業責任者' ? 'ring-2 ring-amber-400 border-amber-300 bg-amber-50' : 'border-stone-200 hover:border-amber-300 hover:bg-amber-50/50',
+                },
+              ].map(j => (
+                <button key={j.key} type="button"
+                  onClick={() => handleJudgment(j.key)}
+                  className={cn(
+                    'flex flex-col items-center gap-2 p-5 rounded-2xl border-2 transition-all cursor-pointer',
+                    j.color
+                  )}>
+                  <span className="text-3xl">{j.icon}</span>
+                  <span className="font-bold text-gray-900 text-sm">{j.title}</span>
+                  <span className="text-xs text-gray-500">{j.desc}</span>
+                  {judgment === j.key && (
+                    <span className={cn(
+                      'flex items-center gap-1 text-xs font-bold mt-1',
+                      j.key === '手直し' ? 'text-emerald-700' : 'text-amber-700'
+                    )}>
+                      <ChevronRight size={12} /> 選択中
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+            {judgment === '手直し' && (
+              <div className="px-5 pb-5 space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">手直し予定日時</label>
+                  <input type="datetime-local" value={plannedAt} onChange={e => setPlannedAt(e.target.value)}
+                    className="w-full h-10 px-3 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition" />
+                </div>
+                {plannedAt && (
+                  <button type="button" onClick={handleReportToSupervisor} disabled={saving}
+                    className="w-full py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm transition-colors disabled:opacity-40">
+                    上司に報告する
+                  </button>
+                )}
+              </div>
             )}
-          </div>
+            {judgment === '事業責任者' && (
+              <div className="px-5 pb-5 space-y-3">
+                <textarea
+                  value={supervisorNote}
+                  onChange={e => setSupervisorNote(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && e.shiftKey && supervisorNote.trim() && handleReportToSupervisor()}
+                  rows={4}
+                  className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 transition resize-none"
+                  placeholder={`お客様のご意見と作業者への聞き取りを踏まえ、あなたはどうすべきだと思いますか？\nShift+Enterで送信`}
+                />
+                {supervisorNote.trim() && (
+                  <button type="button" onClick={handleReportToSupervisor} disabled={saving}
+                    className="w-full py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm transition-colors disabled:opacity-40">
+                    上司に報告する
+                  </button>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
+
+      {/* 事業責任者の返答待ちバナー */}
+      {complaint.status === '是正案提出' && complaint.supervisor_reported_at && (
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 mb-4">
+          <p className="text-sm font-bold text-blue-800 mb-1">⏳ 事業責任者の返答待ち</p>
+          <p className="text-xs text-blue-500">報告日時：{fmtDateTime(complaint.supervisor_reported_at)}</p>
+          {complaint.supervisor_comment && (
+            <div className="mt-3 bg-white rounded-xl px-4 py-3 text-sm text-gray-700 border border-blue-100">
+              <p className="text-xs font-semibold text-blue-600 mb-1">事業責任者のコメント</p>
+              <p className="leading-relaxed">{complaint.supervisor_comment}</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ④ 差し戻しセクション */}
       {complaint.status === '是正案差し戻し' && (

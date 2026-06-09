@@ -237,6 +237,8 @@ export default function ComplaintDetail() {
       setSaving(false)
       return
     }
+    await supabase.from('complaints').update({ status: '是正案提出' }).eq('id', id)
+    setComplaint(c => ({ ...c, status: '是正案提出' }))
     setSaving(false)
     setToast('上司に報告しました ✅')
     setTimeout(() => {

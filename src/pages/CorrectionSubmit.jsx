@@ -99,6 +99,12 @@ export default function CorrectionSubmit() {
 
   const [submitting, setSubmitting]     = useState(false)
   const [loading, setLoading]           = useState(true)
+  const [, setTick]                     = useState(0)
+
+  useEffect(() => {
+    const t = setInterval(() => setTick(n => n + 1), 1000)
+    return () => clearInterval(t)
+  }, [])
 
   const fetchData = useCallback(async () => {
     const [{ data: c }, { data: logs }, { data: corr }] = await Promise.all([
@@ -176,6 +182,21 @@ export default function CorrectionSubmit() {
       </button>
 
       <ProgressBar status={complaint.status === '深掘り提出' ? '深掘り提出' : '是正案提出'} />
+
+      {/* 経過時間タイマー */}
+      {complaint.supervisor_reported_at && (() => {
+        const elapsed = Math.floor((Date.now() - new Date(complaint.supervisor_reported_at).getTime()) / 1000)
+        const pad = n => String(Math.floor(Math.abs(n))).padStart(2, '0')
+        const h = pad(elapsed / 3600)
+        const m = pad((elapsed % 3600) / 60)
+        const s = pad(elapsed % 60)
+        return (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3 mb-5 flex items-center gap-3">
+            <span className="text-xs font-semibold text-amber-700">上司報告からの経過時間</span>
+            <span className="text-lg font-black tabular-nums text-amber-800">{h}:{m}:{s}</span>
+          </div>
+        )
+      })()}
 
       {/* ヘッダー */}
       <div className="bg-white rounded-2xl shadow-sm p-5 mb-5">

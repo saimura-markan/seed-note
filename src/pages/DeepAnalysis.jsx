@@ -310,9 +310,12 @@ export default function DeepAnalysis() {
               </>
             ) : (
               <>
-                <ReadRow label="直接原因" value={correction?.direct_cause} />
-                <ReadRow label="是正処置" value={correction?.correction} />
-                <ReadRow label="運用改善案" value={correction?.improvement} />
+                <p className="text-sm font-semibold text-amber-800">事業責任者へ確認</p>
+                {reportLog && (
+                  <div className="bg-white rounded-xl px-4 py-3 text-sm text-gray-700 border border-amber-100 leading-relaxed">
+                    {reportLog.content}
+                  </div>
+                )}
               </>
             )}
           </div>

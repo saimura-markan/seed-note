@@ -6,7 +6,15 @@ import { supabase } from '@/lib/supabase'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const STATUS_STEPS = ['受付済', '対応中', '改善策作成中', '承認待ち', '完了']
+const STATUS_ORDER = ['未対応', '受付済', '対応中', '改善策作成中', '承認待ち', '完了']
+
+const STATUS_FLOW_STEPS = [
+  { label: '受付',       dotColor: 'bg-red-500',    textColor: 'text-red-500',    borderColor: 'border-l-red-500' },
+  { label: 'STEP A',    dotColor: 'bg-orange-500', textColor: 'text-orange-500', borderColor: 'border-l-orange-500' },
+  { label: 'STEP B',    dotColor: 'bg-amber-500',  textColor: 'text-amber-500',  borderColor: 'border-l-amber-500' },
+  { label: '事業責任者', dotColor: 'bg-blue-500',   textColor: 'text-blue-500',   borderColor: 'border-l-blue-500' },
+  { label: '役員承認',  dotColor: 'bg-indigo-500', textColor: 'text-indigo-500', borderColor: 'border-l-indigo-500' },
+]
 
 const PRIORITY = {
   5: { label: '最高', bg: 'bg-red-100',    text: 'text-red-600',    border: 'border-l-red-400' },
@@ -17,11 +25,12 @@ const PRIORITY = {
 }
 
 const STATUS_BADGE = {
-  '受付済':      'bg-stone-100 text-stone-600 border border-stone-200',
-  '対応中':      'bg-stone-100 text-stone-600 border border-stone-200',
-  '改善策作成中': 'bg-amber-100 text-amber-700 border border-amber-200',
-  '承認待ち':    'bg-teal-100 text-teal-700 border border-teal-200',
-  '完了':        'bg-emerald-100 text-emerald-700 border border-emerald-200',
+  '未対応':       'bg-red-100 text-red-600 border border-red-200',
+  '受付済':       'bg-stone-100 text-stone-600 border border-stone-200',
+  '対応中':       'bg-stone-100 text-stone-600 border border-stone-200',
+  '改善策作成中':  'bg-amber-100 text-amber-700 border border-amber-200',
+  '承認待ち':     'bg-teal-100 text-teal-700 border border-teal-200',
+  '完了':         'bg-emerald-100 text-emerald-700 border border-emerald-200',
 }
 
 const TAG_COLOR = {
@@ -82,21 +91,40 @@ function StatCard({ label, value, sub, icon: Icon, iconBg, iconColor, valueColor
   )
 }
 
-function ProgressDots({ status }) {
-  const step = STATUS_STEPS.indexOf(status)
+function StepProgressBar({ status }) {
+  const stepIndex = STATUS_ORDER.indexOf(status)
   return (
-    <div className="flex gap-1 mt-3">
-      {STATUS_STEPS.map((_, i) => (
-        <div
-          key={i}
-          className={cn(
-            'h-1.5 flex-1 rounded-full',
-            i < step  ? 'bg-emerald-500' :
-            i === step ? 'bg-emerald-400' :
-            'bg-stone-200'
-          )}
-        />
-      ))}
+    <div className="mt-3">
+      <div className="flex items-center">
+        {STATUS_FLOW_STEPS.map((step, i) => {
+          const completed = i < stepIndex
+          const current   = i === stepIndex
+          const isLast    = i === STATUS_FLOW_STEPS.length - 1
+          const dotCls    = completed ? 'bg-[#1D9E75]' : current ? step.dotColor : 'bg-stone-200'
+          return (
+            <div key={i} className={cn('flex items-center', isLast ? '' : 'flex-1')}>
+              <div className={cn('w-2.5 h-2.5 rounded-full shrink-0', dotCls)} />
+              {!isLast && (
+                <div className={cn('h-0.5 flex-1', i < stepIndex ? 'bg-[#1D9E75]' : 'bg-stone-200')} />
+              )}
+            </div>
+          )
+        })}
+      </div>
+      <div className="flex justify-between mt-1">
+        {STATUS_FLOW_STEPS.map((step, i) => {
+          const completed = i < stepIndex
+          const current   = i === stepIndex
+          return (
+            <span key={i} className={cn(
+              'text-[9px] font-medium',
+              completed ? 'text-[#1D9E75]' : current ? step.textColor : 'text-stone-300'
+            )}>
+              {step.label}
+            </span>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -134,7 +162,7 @@ function ComplaintCard({ c, onClick }) {
             <span>施工：{c.worker}</span>
             <span className="text-gray-400">・期限 {c.deadlineMinutes}分</span>
           </div>
-          <ProgressDots status={c.status} />
+          <StepProgressBar status={c.status} />
         </div>
 
         {/* Timer + Status */}
@@ -159,6 +187,52 @@ function ComplaintCard({ c, onClick }) {
   )
 }
 
+function StatusComplaintCard({ c, onClick }) {
+  const stepIndex  = STATUS_ORDER.indexOf(c.status)
+  const step       = STATUS_FLOW_STEPS[stepIndex]
+  const initials   = c.assignee ? c.assignee.charAt(0) : '?'
+  const borderCls  = c.status === '完了' ? 'border-l-emerald-500' : step?.borderColor ?? 'border-l-stone-300'
+
+  return (
+    <div
+      onClick={onClick}
+      className={cn(
+        'bg-white rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-all border-l-[3px] p-4 pl-5',
+        borderCls
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="font-bold text-gray-900 text-[15px]">{c.company}</span>
+            <span className="text-sm text-gray-500">{c.site}</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">
+            <span className={cn('px-2 py-0.5 rounded-full font-medium text-[11px]', TAG_COLOR[c.tag] ?? 'bg-stone-100 text-stone-600')}>
+              {c.tag}
+            </span>
+            <span>施工：{c.worker}</span>
+          </div>
+        </div>
+        <span className={cn('text-xs font-semibold px-3 py-1 rounded-full shrink-0', STATUS_BADGE[c.status] ?? 'bg-stone-100 text-stone-600 border border-stone-200')}>
+          {c.status}
+        </span>
+      </div>
+
+      <StepProgressBar status={c.status} />
+
+      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-stone-100">
+        <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold shrink-0">
+          {initials}
+        </div>
+        <span className="text-xs text-gray-500">
+          今ここで止まっています：<span className="font-semibold text-gray-700">{c.assignee || '未割り当て'}</span> さん（担当）
+        </span>
+      </div>
+    </div>
+  )
+}
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
@@ -168,6 +242,7 @@ export default function Dashboard() {
   const [, setTick] = useState(0)
   const [tab, setTab] = useState('all')
   const [statusFilter, setStatusFilter] = useState('未対応')
+  const [viewMode, setViewMode] = useState('normal')
 
   useEffect(() => {
     const fetch = async () => {
@@ -223,9 +298,15 @@ export default function Dashboard() {
     f === '未対応' ? tabFiltered.filter(c => c.status !== '完了').length
                    : tabFiltered.filter(c => c.status === f).length
 
-  const displayed = statusFilter === '未対応'
+  const displayedNormal = statusFilter === '未対応'
     ? tabFiltered.filter(c => c.status !== '完了')
     : tabFiltered.filter(c => c.status === statusFilter)
+
+  const displayedStatus = [...tabFiltered].sort(
+    (a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status)
+  )
+
+  const displayed = viewMode === 'status' ? displayedStatus : displayedNormal
 
   const tabs = [
     { id: 'all',   label: '全件',           count: complaints.length },
@@ -274,8 +355,30 @@ export default function Dashboard() {
         ))}
       </div>
 
+      {/* View mode toggle */}
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xs text-gray-400 mr-1">表示モード：</span>
+        {[
+          { id: 'normal', label: '通常表示' },
+          { id: 'status', label: 'ステータス表示' },
+        ].map(m => (
+          <button
+            key={m.id}
+            onClick={() => setViewMode(m.id)}
+            className={cn(
+              'px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors border',
+              viewMode === m.id
+                ? 'bg-emerald-800 text-white border-emerald-800'
+                : 'bg-white text-gray-600 border-stone-200 hover:border-stone-300 hover:bg-stone-50'
+            )}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+
       {/* Status filter */}
-      <div className="flex items-center gap-2 mb-5 flex-wrap">
+      {viewMode === 'normal' && <div className="flex items-center gap-2 mb-5 flex-wrap">
         <span className="text-xs text-gray-400 mr-1">表示：</span>
         {STATUS_FILTERS.map(f => {
           const count = getCount(f)
@@ -298,14 +401,20 @@ export default function Dashboard() {
             </button>
           )
         })}
-      </div>
+      </div>}
 
       {/* List */}
       <div className="space-y-3">
         {displayed.length === 0 ? (
           <p className="text-center py-12 text-gray-400 text-sm">該当するクレームがありません</p>
         ) : (
-          displayed.map(c => (
+          displayed.map(c => viewMode === 'status' ? (
+            <StatusComplaintCard
+              key={c.id}
+              c={c}
+              onClick={() => navigate(`/complaints/${c.id}`)}
+            />
+          ) : (
             <ComplaintCard
               key={c.id}
               c={c}

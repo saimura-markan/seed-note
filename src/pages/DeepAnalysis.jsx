@@ -75,6 +75,8 @@ export default function DeepAnalysis() {
   const [orgImprove,  setOrgImprove]  = useState('')
   const [rootTheme,   setRootTheme]   = useState('')
 
+  const [reportLog,  setReportLog]    = useState(null)
+
   const [supervisorComment, setSupervisorComment] = useState('')
   const [approving,  setApproving]    = useState(false)
   const [submitting, setSubmitting]   = useState(false)
@@ -98,6 +100,8 @@ export default function DeepAnalysis() {
       setContactLogs(logs.filter(l => l.type === 'contact'))
       const h = logs.filter(l => l.type === 'hearing').pop()
       if (h) setHearingText(h.content)
+      const r = logs.filter(l => l.type === 'report').pop()
+      if (r) setReportLog(r)
     }
     if (corr && corr[0]) setCorrection(corr[0])
     if (deep && deep[0]) {
@@ -287,6 +291,33 @@ export default function DeepAnalysis() {
           )}
         </div>
       </div>
+
+      {/* ①-② 管理者からの報告 */}
+      {complaint.judgment && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl mb-4 overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-amber-200">
+            <span className="text-sm font-bold text-amber-900">📋 管理者からの報告</span>
+          </div>
+          <div className="p-5 space-y-3">
+            {complaint.judgment === '手直し' ? (
+              <>
+                <p className="text-sm font-semibold text-amber-800">手直しで対応します</p>
+                {reportLog && (
+                  <div className="bg-white rounded-xl px-4 py-3 text-sm text-gray-700 border border-amber-100 leading-relaxed">
+                    {reportLog.content}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <ReadRow label="直接原因" value={correction?.direct_cause} />
+                <ReadRow label="是正処置" value={correction?.correction} />
+                <ReadRow label="運用改善案" value={correction?.improvement} />
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ② 承認/否認 */}
       {['是正案提出', '是正案差し戻し'].includes(complaint.status) && (

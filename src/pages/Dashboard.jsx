@@ -6,14 +6,14 @@ import { supabase } from '@/lib/supabase'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const STATUS_ORDER = ['未対応', '受付済', '対応中', '改善策作成中', '承認待ち', '完了']
+const STATUS_ORDER = ['受付済', '対応中', '是正案提出', '深掘り提出', '承認完了']
 
 const STATUS_FLOW_STEPS = [
-  { label: '受付',       dotColor: 'bg-red-500',    textColor: 'text-red-500',    borderColor: 'border-l-red-500' },
-  { label: 'STEP A',    dotColor: 'bg-orange-500', textColor: 'text-orange-500', borderColor: 'border-l-orange-500' },
-  { label: 'STEP B',    dotColor: 'bg-amber-500',  textColor: 'text-amber-500',  borderColor: 'border-l-amber-500' },
-  { label: '事業責任者', dotColor: 'bg-blue-500',   textColor: 'text-blue-500',   borderColor: 'border-l-blue-500' },
-  { label: '役員承認',  dotColor: 'bg-indigo-500', textColor: 'text-indigo-500', borderColor: 'border-l-indigo-500' },
+  { label: '受付',       dotColor: 'bg-orange-500', textColor: 'text-orange-500', borderColor: 'border-l-orange-500' },
+  { label: 'STEP A',    dotColor: 'bg-amber-500',  textColor: 'text-amber-500',  borderColor: 'border-l-amber-500' },
+  { label: 'STEP B',    dotColor: 'bg-blue-500',   textColor: 'text-blue-500',   borderColor: 'border-l-blue-500' },
+  { label: '事業責任者', dotColor: 'bg-indigo-500', textColor: 'text-indigo-500', borderColor: 'border-l-indigo-500' },
+  { label: '役員承認',  dotColor: 'bg-purple-500', textColor: 'text-purple-500', borderColor: 'border-l-purple-500' },
 ]
 
 const PRIORITY = {
@@ -25,12 +25,11 @@ const PRIORITY = {
 }
 
 const STATUS_BADGE = {
-  '未対応':       'bg-red-100 text-red-600 border border-red-200',
-  '受付済':       'bg-stone-100 text-stone-600 border border-stone-200',
-  '対応中':       'bg-stone-100 text-stone-600 border border-stone-200',
-  '改善策作成中':  'bg-amber-100 text-amber-700 border border-amber-200',
-  '承認待ち':     'bg-teal-100 text-teal-700 border border-teal-200',
-  '完了':         'bg-emerald-100 text-emerald-700 border border-emerald-200',
+  '受付済':     'bg-stone-100 text-stone-600 border border-stone-200',
+  '対応中':     'bg-stone-100 text-stone-600 border border-stone-200',
+  '是正案提出':  'bg-amber-100 text-amber-700 border border-amber-200',
+  '深掘り提出':  'bg-blue-100 text-blue-700 border border-blue-200',
+  '承認完了':    'bg-emerald-100 text-emerald-700 border border-emerald-200',
 }
 
 const TAG_COLOR = {
@@ -42,7 +41,7 @@ const TAG_COLOR = {
   'マナー':     'bg-violet-50 text-violet-700',
 }
 
-const STATUS_FILTERS = ['未対応', '受付済', '対応中', '改善策作成中', '承認待ち', '完了']
+const STATUS_FILTERS = ['未対応', '受付済', '対応中', '是正案提出', '深掘り提出', '承認完了']
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -92,7 +91,7 @@ function StatCard({ label, value, sub, icon: Icon, iconBg, iconColor, valueColor
 }
 
 function StepProgressBar({ status }) {
-  const stepIndex = STATUS_ORDER.indexOf(status)
+  const stepIndex = status === '承認完了' ? STATUS_FLOW_STEPS.length : STATUS_ORDER.indexOf(status)
   return (
     <div className="mt-3">
       <div className="flex items-center">
@@ -191,7 +190,7 @@ function StatusComplaintCard({ c, onClick }) {
   const stepIndex  = STATUS_ORDER.indexOf(c.status)
   const step       = STATUS_FLOW_STEPS[stepIndex]
   const initials   = c.assignee ? c.assignee.charAt(0) : '?'
-  const borderCls  = c.status === '完了' ? 'border-l-emerald-500' : step?.borderColor ?? 'border-l-stone-300'
+  const borderCls  = c.status === '承認完了' ? 'border-l-emerald-500' : step?.borderColor ?? 'border-l-stone-300'
 
   return (
     <div
@@ -282,7 +281,7 @@ export default function Dashboard() {
   const monthDiff     = thisMonthCount - lastMonthCount
 
   const stats = [
-    { label: '未対応クレーム',    value: complaints.filter(c => c.status !== '完了').length, sub: '完了を除く全件',                                          icon: Sprout,      iconBg: 'bg-emerald-100', iconColor: 'text-emerald-700' },
+    { label: '未対応クレーム',    value: complaints.filter(c => c.status !== '承認完了').length, sub: '承認完了を除く全件',                                          icon: Sprout,      iconBg: 'bg-emerald-100', iconColor: 'text-emerald-700' },
     { label: '本日の受付件数',    value: todayCount,                                          sub: `${today}時点`,                                           icon: CalendarDays, iconBg: 'bg-blue-100',    iconColor: 'text-blue-600' },
     { label: '期限超過',          value: overdue.length,                                      sub: '即時フォローが必要',                                      icon: Clock,        iconBg: 'bg-red-100',     iconColor: 'text-red-600', valueColor: 'text-red-600' },
     { label: '今月のクレーム件数', value: thisMonthCount,                                     sub: monthDiff === 0 ? '先月比 ±0件' : `先月比 ${monthDiff > 0 ? '+' : ''}${monthDiff}件`, icon: BarChart2, iconBg: 'bg-orange-100', iconColor: 'text-orange-600' },
@@ -295,11 +294,11 @@ export default function Dashboard() {
     complaints
 
   const getCount = (f) =>
-    f === '未対応' ? tabFiltered.filter(c => c.status !== '完了').length
+    f === '未対応' ? tabFiltered.filter(c => c.status !== '承認完了').length
                    : tabFiltered.filter(c => c.status === f).length
 
   const displayedNormal = statusFilter === '未対応'
-    ? tabFiltered.filter(c => c.status !== '完了')
+    ? tabFiltered.filter(c => c.status !== '承認完了')
     : tabFiltered.filter(c => c.status === statusFilter)
 
   const displayedStatus = [...tabFiltered].sort(

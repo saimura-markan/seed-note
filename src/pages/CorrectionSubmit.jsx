@@ -152,7 +152,7 @@ export default function CorrectionSubmit() {
     } else {
       await supabase.from('complaint_corrections').insert(payload)
     }
-    await supabase.from('complaints').update({ status: '深掘り提出' }).eq('id', id)
+    await supabase.from('complaints').update({ status: '是正案提出' }).eq('id', id)
     setSubmitting(false)
     navigate(`/complaints/${id}/analysis`)
   }

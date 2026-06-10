@@ -84,7 +84,7 @@ export default function Login({ onLogin }) {
 
             {/* ── ロゴ ── */}
             <div className="mb-12 -ml-14">
-              <img src="/seed-note-logo.png" alt="Seed Note" className="h-40 w-auto" />
+              <img src="/seed-note-logo.png" alt="Seed Note" className="h-40 w-auto" style={{ mixBlendMode: 'multiply' }} />
             </div>
 
             {/* ── コンテンツ中央 ── */}
@@ -233,10 +233,7 @@ export default function Login({ onLogin }) {
               <button
                 onClick={handleLogin}
                 disabled={loading || !email || !password}
-                className="w-full h-12 rounded-xl text-white text-sm font-bold transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ background: '#1a4731' }}
-                onMouseEnter={e => { if (email && password && !loading) e.target.style.background = '#14532d' }}
-                onMouseLeave={e => { e.target.style.background = '#1a4731' }}
+                className="w-full h-12 rounded-xl bg-[#1a4731] hover:bg-[#14532d] text-white text-sm font-bold transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">

@@ -83,8 +83,8 @@ export default function Login({ onLogin }) {
           <div className="relative z-10 flex flex-col h-full px-14 py-12">
 
             {/* ── ロゴ ── */}
-            <div className="mb-12">
-              <img src="/seed-note-logo.png" alt="Seed Note" className="h-32 w-auto" />
+            <div className="mb-12 -ml-14">
+              <img src="/seed-note-logo.png" alt="Seed Note" className="h-40 w-auto" />
             </div>
 
             {/* ── コンテンツ中央 ── */}

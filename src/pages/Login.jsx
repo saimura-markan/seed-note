@@ -51,12 +51,17 @@ export default function Login({ onLogin }) {
       >
         {/* 半透明オーバーレイ（テキスト可読性確保） */}
         <div className="absolute inset-0" style={{ background: 'rgba(0,40,15,0.35)' }} />
+        <div className="absolute inset-0 bg-white/10" />
 
         <div className="relative z-10 flex flex-col h-full px-14 py-12">
 
           {/* ロゴ */}
-          <div className="mb-10">
+          <div className="mb-10 flex items-center gap-3">
             <img src="/seed-note-logo.png" alt="Seed Note" className="h-12 w-auto" />
+            <div>
+              <p className="text-lg font-bold text-white leading-tight drop-shadow">Seed Note</p>
+              <p className="text-xs text-green-200 tracking-widest">シードノート</p>
+            </div>
           </div>
 
           {/* メインコピー */}
@@ -66,7 +71,7 @@ export default function Login({ onLogin }) {
               <span className="text-xs font-semibold text-green-100 tracking-wide">組織学習のプラットフォーム</span>
             </div>
 
-            <h1 className="text-5xl font-bold leading-tight mb-4 text-white drop-shadow">
+            <h1 className="text-6xl font-bold leading-tight mb-4 text-white drop-shadow">
               クレームは、<br />
               <span style={{ color: '#4ade80' }}>成長の種。</span>
             </h1>
@@ -79,7 +84,7 @@ export default function Login({ onLogin }) {
               {features.map(({ icon: Icon, label, desc }) => (
                 <div
                   key={label}
-                  className="flex items-start gap-3 bg-white/15 rounded-2xl px-4 py-3.5 border border-white/20 backdrop-blur-sm"
+                  className="flex items-start gap-3 bg-white/20 rounded-2xl px-4 py-3.5 border border-white/30 backdrop-blur-sm"
                 >
                   <div
                     className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center mt-0.5"

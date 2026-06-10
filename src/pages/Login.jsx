@@ -13,8 +13,8 @@ const FEATURES = [
 function Leaf({ cls, style }) {
   return (
     <svg className={cls} style={style} viewBox="0 0 40 52" fill="none">
-      <path d="M20 48 Q20 28 4 10 Q12 6 20 12 Q28 6 36 10 Q20 28 20 48Z" fill="currentColor" />
-      <line x1="20" y1="48" x2="20" y2="14" stroke="white" strokeWidth="1" strokeOpacity=".4" />
+      <path d="M20 48 Q20 28 4 10 Q12 6 20 12 Q28 6 36 10 Q20 28 20 48Z" fill="#4ade80" fillOpacity=".5" />
+      <line x1="20" y1="48" x2="20" y2="14" stroke="#166534" strokeWidth="1" strokeOpacity=".4" />
     </svg>
   )
 }
@@ -73,21 +73,21 @@ export default function Login({ onLogin }) {
         <div className="hidden md:flex md:w-[65%] relative flex-col overflow-hidden bg-gradient-to-br from-white via-green-50 to-green-100">
 
           {/* 浮遊する葉っぱ */}
-          <Leaf cls="lf-a absolute text-green-300 w-12 h-16" style={{ top:'6%',  left:'7%',  '--dur':'9s',  '--delay':'0s' }} />
-          <Leaf cls="lf-b absolute text-emerald-200 w-9 h-12"  style={{ top:'15%', right:'10%','--dur':'11s', '--delay':'1.5s' }} />
-          <Leaf cls="lf-c absolute text-green-200 w-8 h-11"   style={{ top:'48%', left:'4%',  '--dur':'8s',  '--delay':'3s' }} />
-          <Leaf cls="lf-a absolute text-emerald-300 w-14 h-18" style={{ bottom:'22%',right:'8%', '--dur':'12s', '--delay':'0.8s' }} />
-          <Leaf cls="lf-b absolute text-green-300 w-7 h-10"   style={{ top:'35%', left:'48%', '--dur':'7s',  '--delay':'4s' }} />
-          <Leaf cls="lf-c absolute text-emerald-200 w-10 h-14" style={{ bottom:'10%',left:'18%','--dur':'10s', '--delay':'2s' }} />
+          <Leaf cls="lf-a absolute w-12 h-16" style={{ top:'6%',    left:'7%',   '--dur':'9s',  '--delay':'0s'   }} />
+          <Leaf cls="lf-b absolute w-9 h-12"  style={{ top:'15%',   right:'10%', '--dur':'11s', '--delay':'1.5s' }} />
+          <Leaf cls="lf-c absolute w-8 h-11"  style={{ top:'48%',   left:'4%',   '--dur':'8s',  '--delay':'3s'   }} />
+          <Leaf cls="lf-a absolute w-14 h-18" style={{ bottom:'22%',right:'8%',  '--dur':'12s', '--delay':'0.8s' }} />
+          <Leaf cls="lf-b absolute w-7 h-10"  style={{ top:'35%',   left:'48%',  '--dur':'7s',  '--delay':'4s'   }} />
+          <Leaf cls="lf-c absolute w-10 h-14" style={{ bottom:'10%',left:'18%',  '--dur':'10s', '--delay':'2s'   }} />
 
           <div className="relative z-10 flex flex-col h-full px-14 py-12">
 
             {/* ── ロゴ ── */}
             <div className="flex items-center gap-3 mb-12">
-              <img src="/seed-note-logo.png" alt="Seed Note" className="h-10 w-auto" />
+              <img src="/seed-note-logo.png" alt="Seed Note" className="h-12 w-auto" />
               <div>
-                <p className="text-base font-bold leading-tight" style={{ color: '#1a4731' }}>Seed Note</p>
-                <p className="text-[11px] tracking-[0.2em]" style={{ color: '#4ade80' }}>── シードノート ──</p>
+                <p className="text-2xl font-bold leading-tight" style={{ color: '#1a4731' }}>Seed Note</p>
+                <p className="text-sm tracking-[0.2em]" style={{ color: '#4ade80' }}>── シードノート ──</p>
               </div>
             </div>
 
@@ -116,8 +116,8 @@ export default function Login({ onLogin }) {
                 {FEATURES.map(({ icon: Icon, label, desc }) => (
                   <div key={label}
                     className="flex items-start gap-3 bg-white rounded-2xl px-4 py-3.5 shadow-sm border border-green-100">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center mt-0.5 bg-green-50">
-                      <Icon size={15} className="text-green-600" />
+                    <div className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center mt-0.5 bg-green-100">
+                      <Icon size={16} className="text-green-600" />
                     </div>
                     <div>
                       <p className="text-sm font-bold" style={{ color: '#1a4731' }}>{label}</p>
@@ -155,7 +155,7 @@ export default function Login({ onLogin }) {
         {/* ══════════════════════════════════════════════════════
             右パネル 35% — ログインフォーム
         ══════════════════════════════════════════════════════ */}
-        <div className="w-full md:w-[35%] flex items-center justify-center bg-white px-8 py-12 border-l border-gray-100">
+        <div className="w-full md:w-[35%] flex items-start justify-center bg-white px-8 pt-16 pb-12 border-l border-gray-100">
           <div className="w-full max-w-sm">
 
             {/* モバイル用ロゴ */}

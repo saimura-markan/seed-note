@@ -136,10 +136,10 @@ export default function ComplaintOverview() {
       ? { label: '改善報告書を作成 →',   path: `/complaints/${id}/correction`, color: 'bg-emerald-700 hover:bg-emerald-800' } :
     userRole === 'admin' && complaint.status === '改善報告書提出'
       ? { label: '改善報告書を確認 →',   path: `/complaints/${id}/correction`, color: 'bg-emerald-700 hover:bg-emerald-800' } :
-    userRole === 'manager' && complaint.status === '是正案提出'
-      ? { label: '是正案を確認・承認 →', path: `/complaints/${id}/analysis`,  color: 'bg-blue-700 hover:bg-blue-800' } :
+    userRole === 'manager' && ['是正案提出', '是正案差し戻し'].includes(complaint.status)
+      ? { label: '是正案を確認・承認 →', path: `/complaints/${id}/deep-analysis`, color: 'bg-blue-700 hover:bg-blue-800' } :
     userRole === 'manager' && ['是正案承認', '改善報告書提出'].includes(complaint.status)
-      ? { label: '深掘り分析を入力 →', path: `/complaints/${id}/deep-analysis`, color: 'bg-blue-700 hover:bg-blue-800' } :
+      ? { label: '深掘り分析を入力 →',   path: `/complaints/${id}/deep-analysis`, color: 'bg-blue-700 hover:bg-blue-800' } :
     null
 
   return (

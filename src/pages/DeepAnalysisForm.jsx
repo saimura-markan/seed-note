@@ -57,11 +57,29 @@ function fmtDateTime(iso) {
   return new Date(iso).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+function ReadRow({ label, value }) {
+  return (
+    <div className="mb-3 last:mb-0">
+      <p className="text-xs font-semibold text-gray-500 mb-1">{label}</p>
+      <p className="text-sm text-gray-800 bg-stone-50 rounded-xl px-4 py-3 leading-relaxed min-h-[2.5rem]">
+        {value || <span className="text-gray-400 italic">記録なし</span>}
+      </p>
+    </div>
+  )
+}
+
 export default function DeepAnalysisForm() {
   const { id } = useParams()
   const navigate = useNavigate()
 
-  const [complaint,  setComplaint]  = useState(null)
+  const [complaint,          setComplaint]          = useState(null)
+  const [correction,         setCorrection]         = useState(null)
+  const [contactLogs,        setContactLogs]        = useState([])
+  const [hearingText,        setHearingText]        = useState('')
+  const [reportLog,          setReportLog]          = useState(null)
+  const [supervisorComment,  setSupervisorComment]  = useState('')
+  const [approving,          setApproving]          = useState(false)
+
   const [existing,   setExisting]   = useState(null)
   const [rootCause,  setRootCause]  = useState('')
   const [horizontal, setHorizontal] = useState('')
@@ -77,11 +95,21 @@ export default function DeepAnalysisForm() {
   }, [])
 
   const fetchData = useCallback(async () => {
-    const [{ data: c }, { data: deep }] = await Promise.all([
+    const [{ data: c }, { data: logs }, { data: corr }, { data: deep }] = await Promise.all([
       supabase.from('complaints').select('*').eq('id', id).maybeSingle(),
+      supabase.from('complaint_logs').select('*').eq('complaint_id', id).order('created_at'),
+      supabase.from('complaint_corrections').select('*').eq('complaint_id', id).order('created_at').limit(1),
       supabase.from('complaint_deep_analysis').select('*').eq('complaint_id', id).order('created_at').limit(1),
     ])
-    if (c) setComplaint(c)
+    if (c) { setComplaint(c); setSupervisorComment(c.supervisor_comment || '') }
+    if (logs) {
+      setContactLogs(logs.filter(l => l.type === 'contact'))
+      const h = logs.filter(l => l.type === 'hearing').pop()
+      if (h) setHearingText(h.content)
+      const r = logs.filter(l => l.type === 'report').pop()
+      if (r) setReportLog(r)
+    }
+    if (corr && corr[0]) setCorrection(corr[0])
     if (deep && deep[0]) {
       setExisting(deep[0])
       setRootCause(deep[0].root_cause || '')
@@ -93,6 +121,46 @@ export default function DeepAnalysisForm() {
   }, [id])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  // 承認
+  const handleApprove = async () => {
+    setApproving(true)
+    const now = new Date().toISOString()
+    const { data, error } = await supabase.from('complaints').update({
+      status: '是正案承認',
+      supervisor_approved_at: now,
+      supervisor_comment: supervisorComment,
+    }).eq('id', id).select()
+    console.log('[handleApprove] result:', { data, error })
+    if (error) {
+      alert(`承認に失敗しました: ${error.message}`)
+      setApproving(false)
+      return
+    }
+    setApproving(false)
+    await fetchData()
+  }
+
+  // 否認（差し戻し）
+  const handleReject = async () => {
+    if (!supervisorComment.trim()) {
+      alert('差し戻しコメントを入力してください')
+      return
+    }
+    setApproving(true)
+    const { data, error } = await supabase.from('complaints').update({
+      status: '是正案差し戻し',
+      supervisor_comment: supervisorComment,
+    }).eq('id', id).select()
+    console.log('[handleReject] result:', { data, error })
+    if (error) {
+      alert(`差し戻しに失敗しました: ${error.message}`)
+      setApproving(false)
+      return
+    }
+    setApproving(false)
+    await fetchData()
+  }
 
   const canSubmit = rootCause.trim() && horizontal.trim() && orgImprove.trim() && rootTheme
 
@@ -144,6 +212,7 @@ export default function DeepAnalysisForm() {
   const taCls = 'w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition resize-none'
   const labelCls = 'block text-xs font-semibold text-gray-600 mb-1.5'
   const guideCls = 'text-xs text-gray-400 mb-2 italic'
+  const isApprovalPhase = ['是正案提出', '是正案差し戻し'].includes(complaint.status)
 
   return (
     <div className="px-6 py-6 max-w-3xl mx-auto">
@@ -159,7 +228,6 @@ export default function DeepAnalysisForm() {
         const deadline = new Date(complaint.supervisor_reported_at).getTime() + 24 * 60 * 60 * 1000
         const remaining = Math.floor((deadline - Date.now()) / 1000)
         const pad = n => String(Math.floor(Math.abs(n))).padStart(2, '0')
-
         if (remaining <= 0) {
           const over = -remaining
           return (
@@ -172,17 +240,12 @@ export default function DeepAnalysisForm() {
             </div>
           )
         }
-
-        const h = pad(remaining / 3600)
-        const m = pad((remaining % 3600) / 60)
-        const s = pad(remaining % 60)
-        const isRed    = remaining < 6 * 3600
-        const isOrange = !isRed && remaining < 12 * 3600
-        const bg    = isRed ? 'bg-red-50 border-red-300'      : isOrange ? 'bg-orange-50 border-orange-300' : 'bg-amber-50 border-amber-200'
-        const label = isRed ? 'text-red-700'                  : isOrange ? 'text-orange-700'                : 'text-amber-700'
-        const value = isRed ? 'text-red-700'                  : isOrange ? 'text-orange-800'               : 'text-amber-800'
+        const h = pad(remaining / 3600); const m = pad((remaining % 3600) / 60); const s = pad(remaining % 60)
+        const isRed = remaining < 6 * 3600; const isOrange = !isRed && remaining < 12 * 3600
+        const bg    = isRed ? 'bg-red-50 border-red-300'    : isOrange ? 'bg-orange-50 border-orange-300' : 'bg-amber-50 border-amber-200'
+        const label = isRed ? 'text-red-700'                : isOrange ? 'text-orange-700'                : 'text-amber-700'
+        const value = isRed ? 'text-red-700'                : isOrange ? 'text-orange-800'               : 'text-amber-800'
         const icon  = isRed ? <AlertTriangle size={16} className="text-red-600 shrink-0" /> : null
-
         return (
           <div className={`flex items-center gap-3 border rounded-2xl px-5 py-3 mb-5 ${bg}`}>
             {icon}
@@ -196,76 +259,181 @@ export default function DeepAnalysisForm() {
 
       {/* ヘッダー */}
       <div className="bg-white rounded-2xl shadow-sm p-5 mb-5">
-        <p className="text-lg font-bold text-gray-900 mb-0.5">🔍 深掘り・学習</p>
+        <p className="text-lg font-bold text-gray-900 mb-0.5">
+          {isApprovalPhase ? '✅ 是正案の確認・承認' : '🔍 深掘り・学習'}
+        </p>
         <p className="text-sm text-gray-500">{complaint.client_name} — {complaint.site_name}</p>
       </div>
 
-      {/* 改善報告書 */}
-      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-4">
-        <p className="text-sm font-semibold text-blue-800">📋 改善報告書が提出されました。深掘り分析を行ってください。</p>
-        {complaint.improvement_report && (
-          <div className="mt-2 bg-white rounded-xl px-4 py-3 text-sm text-gray-700 border border-blue-100">
-            <p className="text-xs font-semibold text-blue-600 mb-1">管理者の改善報告書</p>
-            <p className="leading-relaxed">{complaint.improvement_report}</p>
+      {/* ── 承認フェーズ（是正案提出 / 是正案差し戻し） ── */}
+      {isApprovalPhase && (
+        <>
+          {/* 注意バナー */}
+          <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-5">
+            <AlertTriangle size={16} className="text-amber-600 mt-0.5 shrink-0" />
+            <p className="text-sm text-amber-800 leading-relaxed">
+              テキストだけでは伝わらない部分があります。<strong>必ず管理者と直接会話・電話で状況を確認してから</strong>判断してください。
+            </p>
           </div>
-        )}
-      </div>
 
-      {/* ③ 深掘り分析 */}
-      <div className="bg-white rounded-2xl shadow-sm mb-4 p-5 space-y-4">
-        <p className="text-sm font-bold text-gray-800">③ 深掘り分析</p>
-        <div>
-          <label className={labelCls}>真因 <span className="text-red-500">*</span></label>
-          <p className={guideCls}>なぜこの問題が起きたのか？組織・仕組みの観点から一言で</p>
-          <textarea value={rootCause} onChange={e => setRootCause(e.target.value)}
-            rows={3} placeholder="例：現場確認の責任者が明確でなく、個人の判断に委ねられていた"
-            className={taCls} />
-        </div>
-        <div>
-          <label className={labelCls}>横展開 <span className="text-red-500">*</span></label>
-          <p className={guideCls}>他部署でも同じことが起きるとしたらどこか？</p>
-          <textarea value={horizontal} onChange={e => setHorizontal(e.target.value)}
-            rows={3} placeholder="例：産廃部門でも搬入前確認のチェックが属人化している可能性がある"
-            className={taCls} />
-        </div>
-        <div>
-          <label className={labelCls}>組織改善案 <span className="text-red-500">*</span></label>
-          <p className={guideCls}>会社として何を変えるか？</p>
-          <textarea value={orgImprove} onChange={e => setOrgImprove(e.target.value)}
-            rows={3} placeholder="例：全部署共通の作業前チェックリストを策定し、月次で見直す体制を設ける"
-            className={taCls} />
-        </div>
-      </div>
+          {/* ① 管理者の是正案（読み取り専用） */}
+          <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-stone-100 bg-stone-50">
+              <span className="text-sm font-bold text-gray-700">① 管理者の是正案</span>
+            </div>
+            <div className="p-5">
+              <div className="mb-3">
+                <p className="text-xs font-semibold text-gray-500 mb-2">お客様への連絡記録</p>
+                {contactLogs.length === 0
+                  ? <p className="text-sm text-gray-400 italic">記録なし</p>
+                  : contactLogs.map(log => (
+                    <div key={log.id} className={cn('flex items-center gap-2 text-sm px-3 py-2 rounded-lg mb-1',
+                      log.content === '繋がらず' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-800')}>
+                      <span>{log.content === '繋がらず' ? '🔴' : '✅'}</span>
+                      <span className="flex-1">{log.content}</span>
+                      <span className="text-xs text-gray-400">{fmtDateTime(log.created_at)}</span>
+                    </div>
+                  ))
+                }
+              </div>
+              <ReadRow label="作業者からの聞き取り" value={hearingText} />
+              {correction && (
+                <>
+                  <ReadRow label="直接原因" value={correction.direct_cause} />
+                  <ReadRow label="是正処置" value={correction.correction} />
+                  <ReadRow label="運用改善案" value={correction.improvement} />
+                </>
+              )}
+            </div>
+          </div>
 
-      {/* ④ 根源テーマの分類 */}
-      <div className="bg-white rounded-2xl shadow-sm mb-5 p-5">
-        <label className={labelCls}>④ 根源テーマの分類 <span className="text-red-500">*</span></label>
-        <div className="flex flex-wrap gap-2 mt-2">
-          {ROOT_THEMES.map(theme => (
-            <button key={theme} type="button"
-              onClick={() => setRootTheme(theme)}
-              className={cn(
-                'px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all',
-                rootTheme === theme
-                  ? 'bg-emerald-700 text-white border-emerald-700'
-                  : 'bg-white text-gray-600 border-stone-200 hover:border-emerald-300 hover:bg-emerald-50'
-              )}>
-              {theme}
+          {/* 管理者からの報告 */}
+          {complaint.judgment && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl mb-4 overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-amber-200">
+                <span className="text-sm font-bold text-amber-900">📋 管理者からの報告</span>
+              </div>
+              <div className="p-5 space-y-3">
+                <p className="text-sm font-semibold text-amber-800">
+                  {complaint.judgment === '手直し' ? '手直しで対応します' : '事業責任者へ確認'}
+                </p>
+                {reportLog && (
+                  <div className="bg-white rounded-xl px-4 py-3 text-sm text-gray-700 border border-amber-100 leading-relaxed">
+                    {reportLog.content}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ② 承認/否認 */}
+          <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-stone-100">
+              <span className="text-sm font-bold text-gray-800">② 是正案の承認・否認</span>
+            </div>
+            <div className="p-5 space-y-3">
+              <div>
+                <label className={labelCls}>コメント（否認の場合は必須）</label>
+                <textarea value={supervisorComment} onChange={e => setSupervisorComment(e.target.value)}
+                  rows={3} placeholder="承認・否認の理由やフィードバックを記入してください"
+                  className={taCls} />
+              </div>
+              <div className="flex gap-3">
+                <button type="button" onClick={handleReject} disabled={approving}
+                  className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm transition-colors disabled:opacity-40">
+                  {approving ? '処理中...' : '否認（差し戻し）'}
+                </button>
+                <button type="button" onClick={handleApprove} disabled={approving}
+                  className="flex-1 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm transition-colors disabled:opacity-40">
+                  {approving ? '処理中...' : '承認'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* 是正案承認済みバナー */}
+      {complaint.status === '是正案承認' && (
+        <div className="bg-green-50 border border-green-200 rounded-2xl px-5 py-4 mb-4 flex items-center gap-2">
+          <span className="text-green-700 font-bold text-sm">✅ 是正案を承認済み</span>
+          {complaint.supervisor_comment && (
+            <span className="text-xs text-green-600">— {complaint.supervisor_comment}</span>
+          )}
+        </div>
+      )}
+
+      {/* ── 深掘りフェーズ（改善報告書提出後） ── */}
+      {complaint.status === '改善報告書提出' && (
+        <>
+          {/* 改善報告書 */}
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-4">
+            <p className="text-sm font-semibold text-blue-800">📋 改善報告書が提出されました。深掘り分析を行ってください。</p>
+            {complaint.improvement_report && (
+              <div className="mt-2 bg-white rounded-xl px-4 py-3 text-sm text-gray-700 border border-blue-100">
+                <p className="text-xs font-semibold text-blue-600 mb-1">管理者の改善報告書</p>
+                <p className="leading-relaxed">{complaint.improvement_report}</p>
+              </div>
+            )}
+          </div>
+
+          {/* ③ 深掘り分析 */}
+          <div className="bg-white rounded-2xl shadow-sm mb-4 p-5 space-y-4">
+            <p className="text-sm font-bold text-gray-800">③ 深掘り分析</p>
+            <div>
+              <label className={labelCls}>真因 <span className="text-red-500">*</span></label>
+              <p className={guideCls}>なぜこの問題が起きたのか？組織・仕組みの観点から一言で</p>
+              <textarea value={rootCause} onChange={e => setRootCause(e.target.value)}
+                rows={3} placeholder="例：現場確認の責任者が明確でなく、個人の判断に委ねられていた"
+                className={taCls} />
+            </div>
+            <div>
+              <label className={labelCls}>横展開 <span className="text-red-500">*</span></label>
+              <p className={guideCls}>他部署でも同じことが起きるとしたらどこか？</p>
+              <textarea value={horizontal} onChange={e => setHorizontal(e.target.value)}
+                rows={3} placeholder="例：産廃部門でも搬入前確認のチェックが属人化している可能性がある"
+                className={taCls} />
+            </div>
+            <div>
+              <label className={labelCls}>組織改善案 <span className="text-red-500">*</span></label>
+              <p className={guideCls}>会社として何を変えるか？</p>
+              <textarea value={orgImprove} onChange={e => setOrgImprove(e.target.value)}
+                rows={3} placeholder="例：全部署共通の作業前チェックリストを策定し、月次で見直す体制を設ける"
+                className={taCls} />
+            </div>
+          </div>
+
+          {/* ④ 根源テーマの分類 */}
+          <div className="bg-white rounded-2xl shadow-sm mb-5 p-5">
+            <label className={labelCls}>④ 根源テーマの分類 <span className="text-red-500">*</span></label>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {ROOT_THEMES.map(theme => (
+                <button key={theme} type="button"
+                  onClick={() => setRootTheme(theme)}
+                  className={cn(
+                    'px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all',
+                    rootTheme === theme
+                      ? 'bg-emerald-700 text-white border-emerald-700'
+                      : 'bg-white text-gray-600 border-stone-200 hover:border-emerald-300 hover:bg-emerald-50'
+                  )}>
+                  {theme}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-3 pb-8">
+            <button type="button" onClick={handleClear}
+              className="px-5 h-12 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50 transition-colors">
+              クリア
             </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex gap-3 pb-8">
-        <button type="button" onClick={handleClear}
-          className="px-5 h-12 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50 transition-colors">
-          クリア
-        </button>
-        <button type="button" onClick={handleSubmit} disabled={submitting || !canSubmit}
-          className="flex-1 h-12 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
-          {submitting ? '送信中...' : '役員承認へ送付'}
-        </button>
-      </div>
+            <button type="button" onClick={handleSubmit} disabled={submitting || !canSubmit}
+              className="flex-1 h-12 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+              {submitting ? '送信中...' : '役員承認へ送付'}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }

@@ -14,6 +14,7 @@ import MyPage from './pages/MyPage'
 
 function RoleGuard({ user, allow, deny, children }) {
   const role = user?.app_metadata?.role || 'user'
+  if (role === 'judgment') return children
   const blocked = deny ? deny.includes(role) : allow ? !allow.includes(role) : false
   if (blocked) return <Navigate to="/dashboard" replace />
   return children

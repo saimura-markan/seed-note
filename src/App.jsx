@@ -9,6 +9,7 @@ import ComplaintOverview from './pages/ComplaintOverview'
 import ComplaintDetail from './pages/ComplaintDetail'
 import CorrectionSubmit from './pages/CorrectionSubmit'
 import DeepAnalysis from './pages/DeepAnalysis'
+import DeepAnalysisForm from './pages/DeepAnalysisForm'
 import Approval from './pages/Approval'
 import MyPage from './pages/MyPage'
 
@@ -69,6 +70,9 @@ export default function App() {
           } />
           <Route path="complaints/:id/analysis" element={
             <RoleGuard user={user} deny={['admin']}><DeepAnalysis /></RoleGuard>
+          } />
+          <Route path="complaints/:id/deep-analysis" element={
+            <RoleGuard user={user} deny={['admin']}><DeepAnalysisForm /></RoleGuard>
           } />
           <Route path="complaints/:id/approval" element={
             <RoleGuard user={user} allow={['judgment']}><Approval /></RoleGuard>

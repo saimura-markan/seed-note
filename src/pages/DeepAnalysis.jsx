@@ -101,11 +101,17 @@ export default function DeepAnalysis() {
   const handleApprove = async () => {
     setApproving(true)
     const now = new Date().toISOString()
-    await supabase.from('complaints').update({
+    const { data, error } = await supabase.from('complaints').update({
       status: '是正案承認',
       supervisor_approved_at: now,
       supervisor_comment: supervisorComment,
-    }).eq('id', id)
+    }).eq('id', id).select()
+    console.log('[handleApprove] result:', { data, error })
+    if (error) {
+      alert(`承認に失敗しました: ${error.message}`)
+      setApproving(false)
+      return
+    }
     setComplaint(c => ({ ...c, status: '是正案承認', supervisor_approved_at: now, supervisor_comment: supervisorComment }))
     setApproving(false)
   }

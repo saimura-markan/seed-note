@@ -140,6 +140,8 @@ export default function ComplaintOverview() {
       ? { label: '是正案を確認・承認 →', path: `/complaints/${id}/deep-analysis`, color: 'bg-blue-700 hover:bg-blue-800' } :
     userRole === 'manager' && ['是正案承認', '改善報告書提出'].includes(complaint.status)
       ? { label: '深掘り分析を入力 →',   path: `/complaints/${id}/deep-analysis`, color: 'bg-blue-700 hover:bg-blue-800' } :
+    userRole === 'judgment' && complaint.status === '深掘り提出'
+      ? { label: '役員承認へ →',         path: `/complaints/${id}/approval`,      color: 'bg-amber-600 hover:bg-amber-700' } :
     null
 
   return (

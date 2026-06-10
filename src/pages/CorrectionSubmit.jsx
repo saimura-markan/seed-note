@@ -178,7 +178,7 @@ export default function CorrectionSubmit() {
     <div className="px-6 py-6 max-w-3xl mx-auto">
       <button onClick={() => navigate(`/complaints/${id}`)}
         className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 mb-5 transition-colors">
-        <ArrowLeft size={15} /> 対応記録に戻る
+        <ArrowLeft size={15} /> 概要に戻る
       </button>
 
       <ProgressBar status={complaint.status === '深掘り提出' ? '深掘り提出' : '是正案提出'} />

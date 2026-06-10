@@ -305,9 +305,9 @@ export default function ComplaintDetail() {
           {toast}
         </div>
       )}
-      <button onClick={() => navigate('/dashboard')}
+      <button onClick={() => navigate(`/complaints/${id}`)}
         className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 mb-5 transition-colors">
-        <ArrowLeft size={15} /> ダッシュボードに戻る
+        <ArrowLeft size={15} /> 概要に戻る
       </button>
 
       <ProgressBar status={complaint.status} />

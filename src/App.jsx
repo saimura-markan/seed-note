@@ -5,6 +5,7 @@ import Login from './pages/Login'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import ComplaintNew from './pages/ComplaintNew'
+import ComplaintOverview from './pages/ComplaintOverview'
 import ComplaintDetail from './pages/ComplaintDetail'
 import CorrectionSubmit from './pages/CorrectionSubmit'
 import DeepAnalysis from './pages/DeepAnalysis'
@@ -59,7 +60,10 @@ export default function App() {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="complaints/new" element={<ComplaintNew />} />
-          <Route path="complaints/:id" element={<ComplaintDetail />} />
+          <Route path="complaints/:id" element={<ComplaintOverview />} />
+          <Route path="complaints/:id/detail" element={
+            <RoleGuard user={user} allow={['admin']}><ComplaintDetail /></RoleGuard>
+          } />
           <Route path="complaints/:id/correction" element={
             <RoleGuard user={user} allow={['admin']}><CorrectionSubmit /></RoleGuard>
           } />

@@ -45,14 +45,12 @@ export default function Login({ onLogin }) {
         className="hidden md:flex md:w-[65%] relative flex-col overflow-hidden"
         style={{
           backgroundImage: 'url(/seed-note-bg.png)',
-          backgroundSize: '154% auto',
-          backgroundPosition: 'left center',
-          backgroundRepeat: 'no-repeat',
-          backgroundColor: '#f0fdf4',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
         }}
       >
         {/* 半透明オーバーレイ（テキスト可読性確保） */}
-        <div className="absolute inset-0" style={{ background: 'rgba(255,255,255,0.45)' }} />
+        <div className="absolute inset-0" style={{ background: 'rgba(0,40,15,0.35)' }} />
 
         <div className="relative z-10 flex flex-col h-full px-14 py-12">
 
@@ -63,16 +61,16 @@ export default function Login({ onLogin }) {
 
           {/* メインコピー */}
           <div className="flex-1 flex flex-col justify-center">
-            <div className="inline-flex items-center gap-2 mb-6 px-3.5 py-1.5 rounded-full border border-green-200 bg-white/70 w-fit">
-              <BarChart2 size={13} className="text-green-600" />
-              <span className="text-xs font-semibold text-green-700 tracking-wide">組織学習のプラットフォーム</span>
+            <div className="inline-flex items-center gap-2 mb-6 px-3.5 py-1.5 rounded-full border border-green-300/50 bg-white/20 backdrop-blur-sm w-fit">
+              <BarChart2 size={13} className="text-green-300" />
+              <span className="text-xs font-semibold text-green-100 tracking-wide">組織学習のプラットフォーム</span>
             </div>
 
-            <h1 className="text-5xl font-bold leading-tight mb-4" style={{ color: '#1a4731' }}>
+            <h1 className="text-5xl font-bold leading-tight mb-4 text-white drop-shadow">
               クレームは、<br />
-              <span style={{ color: '#16a34a' }}>成長の種。</span>
+              <span style={{ color: '#4ade80' }}>成長の種。</span>
             </h1>
-            <p className="text-lg font-medium mb-10" style={{ color: '#3d6b51' }}>
+            <p className="text-lg font-medium mb-10 text-green-100 drop-shadow">
               記録し、分析し、組織を育てる。
             </p>
 
@@ -81,7 +79,7 @@ export default function Login({ onLogin }) {
               {features.map(({ icon: Icon, label, desc }) => (
                 <div
                   key={label}
-                  className="flex items-start gap-3 bg-white/70 rounded-2xl px-4 py-3.5 border border-green-100 backdrop-blur-sm"
+                  className="flex items-start gap-3 bg-white/15 rounded-2xl px-4 py-3.5 border border-white/20 backdrop-blur-sm"
                 >
                   <div
                     className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center mt-0.5"
@@ -90,8 +88,8 @@ export default function Login({ onLogin }) {
                     <Icon size={15} style={{ color: '#16a34a' }} />
                   </div>
                   <div>
-                    <p className="text-sm font-bold" style={{ color: '#1a4731' }}>{label}</p>
-                    <p className="text-xs mt-0.5" style={{ color: '#6b9e7f' }}>{desc}</p>
+                    <p className="text-sm font-bold text-white">{label}</p>
+                    <p className="text-xs mt-0.5 text-green-200">{desc}</p>
                   </div>
                 </div>
               ))}
@@ -99,7 +97,7 @@ export default function Login({ onLogin }) {
           </div>
 
           {/* 下部キャッチコピー */}
-          <p className="text-sm" style={{ color: '#4b7a5e' }}>
+          <p className="text-sm text-green-100 drop-shadow">
             小さな気づきが、未来の大きな成長につながる。
           </p>
         </div>

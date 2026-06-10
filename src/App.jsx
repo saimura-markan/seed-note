@@ -14,7 +14,6 @@ import MyPage from './pages/MyPage'
 
 function RoleGuard({ user, allow, deny, children }) {
   const role = user?.app_metadata?.role || 'user'
-  if (role === 'judgment') return children
   const blocked = deny ? deny.includes(role) : allow ? !allow.includes(role) : false
   if (blocked) return <Navigate to="/dashboard" replace />
   return children
@@ -63,10 +62,10 @@ export default function App() {
           <Route path="complaints/new" element={<ComplaintNew />} />
           <Route path="complaints/:id" element={<ComplaintOverview />} />
           <Route path="complaints/:id/detail" element={
-            <RoleGuard user={user} allow={['admin']}><ComplaintDetail /></RoleGuard>
+            <RoleGuard user={user} allow={['admin', 'judgment']}><ComplaintDetail /></RoleGuard>
           } />
           <Route path="complaints/:id/correction" element={
-            <RoleGuard user={user} allow={['admin']}><CorrectionSubmit /></RoleGuard>
+            <RoleGuard user={user} allow={['admin', 'judgment']}><CorrectionSubmit /></RoleGuard>
           } />
           <Route path="complaints/:id/deep-analysis" element={
             <RoleGuard user={user} deny={['admin']}><DeepAnalysisForm /></RoleGuard>

@@ -114,6 +114,7 @@ export default function DeepAnalysis() {
     }
     setComplaint(c => ({ ...c, status: '是正案承認', supervisor_approved_at: now, supervisor_comment: supervisorComment }))
     setApproving(false)
+    await fetchData()
   }
 
   const handleReject = async () => {

@@ -154,7 +154,7 @@ export default function CorrectionSubmit() {
     }
     await supabase.from('complaints').update({ status: '是正案提出' }).eq('id', id)
     setSubmitting(false)
-    navigate(`/complaints/${id}/analysis`)
+    navigate(`/complaints/${id}`)
   }
 
   const handleClear = () => {

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { Mail, Lock, Eye, EyeOff, BookOpen, BarChart2, GraduationCap, TrendingUp } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
 
 // ─── 認証ロジック（変更禁止） ─────────────────────────────────────────────────
 
@@ -26,13 +26,6 @@ export default function Login({ onLogin }) {
   // ─── UI state のみ ──────────────────────────────────────────────────────────
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
-
-  const features = [
-    { icon: BookOpen,     label: '記録する',   desc: 'クレームを即時記録' },
-    { icon: BarChart2,    label: '分析する',   desc: '原因を深掘り分析' },
-    { icon: GraduationCap,label: '学習する',   desc: '組織知識を蓄積' },
-    { icon: TrendingUp,   label: '成長する',   desc: '継続的に改善' },
-  ]
 
   return (
     <>
@@ -61,71 +54,11 @@ export default function Login({ onLogin }) {
             左エリア 65%
         ══════════════════════════════════════ */}
         <div className="hidden md:flex md:w-[65%] relative flex-col overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 40%, #ffffff 100%)' }}>
+          style={{ backgroundImage: 'url(/seed-note-bg.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
 
-          {/* 浮遊する葉っぱ */}
-          <svg className="leaf-1 absolute top-[8%] left-[5%] w-16 h-16 text-green-300" viewBox="0 0 60 60" fill="currentColor"><ellipse cx="30" cy="22" rx="20" ry="12" transform="rotate(-20 30 22)"/></svg>
-          <svg className="leaf-2 absolute top-[20%] right-[8%] w-12 h-12 text-emerald-200" viewBox="0 0 60 60" fill="currentColor"><ellipse cx="30" cy="22" rx="18" ry="11" transform="rotate(25 30 22)"/></svg>
-          <svg className="leaf-3 absolute top-[55%] left-[3%] w-10 h-10 text-green-200" viewBox="0 0 60 60" fill="currentColor"><ellipse cx="30" cy="22" rx="16" ry="10" transform="rotate(-10 30 22)"/></svg>
-          <svg className="leaf-4 absolute bottom-[25%] right-[12%] w-14 h-14 text-emerald-100" viewBox="0 0 60 60" fill="currentColor"><ellipse cx="30" cy="22" rx="20" ry="12" transform="rotate(15 30 22)"/></svg>
-          <svg className="leaf-5 absolute top-[40%] left-[45%] w-8 h-8 text-green-300" viewBox="0 0 60 60" fill="currentColor"><ellipse cx="30" cy="22" rx="14" ry="9" transform="rotate(-30 30 22)"/></svg>
+          {/* 背景オーバーレイ（可読性確保） */}
+          <div className="absolute inset-0" style={{ background: 'rgba(255,255,255,0.15)' }} />
 
-          <div className="relative z-10 flex flex-col h-full px-14 py-12">
-
-            {/* ロゴ */}
-            <div className="mb-10">
-              <img src="/seed-note-logo.png" alt="Seed Note" className="h-12 w-auto" />
-            </div>
-
-            {/* メインコピー */}
-            <div className="flex-1 flex flex-col justify-center">
-              <div className="inline-flex items-center gap-2 mb-6 px-3.5 py-1.5 rounded-full border border-green-200 bg-white/60 w-fit">
-                <BarChart2 size={13} className="text-green-600" />
-                <span className="text-xs font-semibold text-green-700 tracking-wide">組織学習のプラットフォーム</span>
-              </div>
-
-              <h1 className="text-5xl font-bold leading-tight mb-4" style={{ color: '#1a4731' }}>
-                クレームは、<br />
-                <span style={{ color: '#16a34a' }}>成長の種。</span>
-              </h1>
-              <p className="text-lg font-medium mb-10" style={{ color: '#4b7a5e' }}>
-                記録し、分析し、組織を育てる。
-              </p>
-
-              {/* 特徴4点 */}
-              <div className="grid grid-cols-2 gap-3 mb-12">
-                {features.map(({ icon: Icon, label, desc }) => (
-                  <div key={label} className="flex items-start gap-3 bg-white/50 rounded-2xl px-4 py-3.5 border border-green-100">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center mt-0.5"
-                      style={{ background: 'rgba(74,222,128,0.2)' }}>
-                      <Icon size={15} style={{ color: '#16a34a' }} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold" style={{ color: '#1a4731' }}>{label}</p>
-                      <p className="text-xs mt-0.5" style={{ color: '#6b9e7f' }}>{desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 下部：芽SVG＋キャッチ */}
-            <div className="flex items-end gap-6">
-              <svg width="72" height="80" viewBox="0 0 72 80" fill="none">
-                {/* 茎 */}
-                <line x1="36" y1="78" x2="36" y2="38" stroke="#16a34a" strokeWidth="3" strokeLinecap="round"/>
-                {/* 左葉 */}
-                <ellipse cx="22" cy="34" rx="16" ry="9" transform="rotate(-20 22 34)" fill="#4ade80" fillOpacity=".8"/>
-                {/* 右葉 */}
-                <ellipse cx="50" cy="34" rx="16" ry="9" transform="rotate(20 50 34)" fill="#22c55e" fillOpacity=".9"/>
-                {/* 土 */}
-                <ellipse cx="36" cy="76" rx="18" ry="4" fill="#a3c9a8" fillOpacity=".4"/>
-              </svg>
-              <p className="text-sm leading-relaxed pb-2" style={{ color: '#4b7a5e' }}>
-                小さな気づきが、<br />未来の大きな成長につながる。
-              </p>
-            </div>
-          </div>
         </div>
 
         {/* ══════════════════════════════════════

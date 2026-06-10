@@ -123,12 +123,19 @@ export default function DeepAnalysis() {
       return
     }
     setApproving(true)
-    await supabase.from('complaints').update({
+    const { data, error } = await supabase.from('complaints').update({
       status: '是正案差し戻し',
       supervisor_comment: supervisorComment,
-    }).eq('id', id)
+    }).eq('id', id).select()
+    console.log('[handleReject] result:', { data, error })
+    if (error) {
+      alert(`差し戻しに失敗しました: ${error.message}`)
+      setApproving(false)
+      return
+    }
     setComplaint(c => ({ ...c, status: '是正案差し戻し', supervisor_comment: supervisorComment }))
     setApproving(false)
+    await fetchData()
   }
 
   if (loading) return (

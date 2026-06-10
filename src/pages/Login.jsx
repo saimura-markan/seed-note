@@ -121,26 +121,12 @@ export default function Login({ onLogin }) {
               </div>
             </div>
 
-            {/* ── 下部：芽SVG＋テキスト ── */}
-            <div className="flex items-end gap-5">
-              <svg width="60" height="70" viewBox="0 0 60 70" fill="none" className="flex-shrink-0">
-                {/* 茎 */}
-                <line x1="30" y1="68" x2="30" y2="36" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round"/>
-                {/* 左葉 */}
-                <ellipse cx="18" cy="32" rx="14" ry="8" transform="rotate(-22 18 32)" fill="#4ade80" fillOpacity=".85"/>
-                {/* 右葉 */}
-                <ellipse cx="42" cy="32" rx="14" ry="8" transform="rotate(22 42 32)" fill="#22c55e" fillOpacity=".9"/>
-                {/* 葉脈（左） */}
-                <line x1="18" y1="32" x2="30" y2="36" stroke="white" strokeWidth="1" strokeOpacity=".5" strokeLinecap="round"/>
-                {/* 葉脈（右） */}
-                <line x1="42" y1="32" x2="30" y2="36" stroke="white" strokeWidth="1" strokeOpacity=".5" strokeLinecap="round"/>
-                {/* 土 */}
-                <ellipse cx="30" cy="66" rx="16" ry="3.5" fill="#a3c9a8" fillOpacity=".45"/>
-              </svg>
-              <p className="text-sm leading-relaxed pb-1" style={{ color: '#4b7a5e' }}>
-                小さな気づきが、<br />未来の大きな成長につながる。
-              </p>
-            </div>
+          {/* ── 下部画像（絶対配置） ── */}
+          <img
+            src="/seed-note-bottom.jpg"
+            alt=""
+            className="absolute bottom-0 left-0 right-0 w-full h-48 object-cover object-bottom"
+          />
 
           </div>
         </div>

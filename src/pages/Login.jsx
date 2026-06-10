@@ -83,12 +83,8 @@ export default function Login({ onLogin }) {
           <div className="relative z-10 flex flex-col h-full px-14 py-12">
 
             {/* ── ロゴ ── */}
-            <div className="flex items-center gap-3 mb-12">
-              <img src="/seed-note-logo.png" alt="Seed Note" className="h-12 w-auto" />
-              <div>
-                <p className="text-2xl font-bold leading-tight" style={{ color: '#1a4731' }}>Seed Note</p>
-                <p className="text-sm tracking-[0.2em]" style={{ color: '#4ade80' }}>── シードノート ──</p>
-              </div>
+            <div className="mb-12">
+              <img src="/seed-note-logo.png" alt="Seed Note" className="h-8 w-auto" />
             </div>
 
             {/* ── コンテンツ中央 ── */}

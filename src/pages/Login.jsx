@@ -108,17 +108,14 @@ export default function Login({ onLogin }) {
               </p>
 
               {/* 機能カード 4枚 */}
-              <div className="grid grid-cols-2 gap-3 mb-10">
+              <div className="grid grid-cols-4 gap-3 mb-10">
                 {FEATURES.map(({ icon: Icon, label, desc }) => (
-                  <div key={label}
-                    className="flex items-start gap-3 bg-white rounded-2xl px-4 py-3.5 shadow-sm border border-green-100">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center mt-0.5 bg-green-100">
-                      <Icon size={16} className="text-green-600" />
+                  <div key={label} className="bg-white rounded-xl px-3 py-4 text-center shadow-sm">
+                    <div className="w-10 h-10 bg-green-100 rounded-full mx-auto mb-2 flex items-center justify-center">
+                      <Icon size={18} className="text-green-600" />
                     </div>
-                    <div>
-                      <p className="text-sm font-bold" style={{ color: '#1a4731' }}>{label}</p>
-                      <p className="text-xs mt-0.5 text-gray-500">{desc}</p>
-                    </div>
+                    <p className="text-sm font-bold text-gray-800">{label}</p>
+                    <p className="text-xs text-gray-500 mt-1">{desc}</p>
                   </div>
                 ))}
               </div>

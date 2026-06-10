@@ -497,26 +497,16 @@ export default function ComplaintDetail() {
         </div>
       )}
 
-      {/* ④ 改善報告書セクション */}
+      {/* ④ 是正報告書セクション */}
       {complaint.status === '是正案承認' && (
-        <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-stone-100 bg-green-50">
-            <span className="text-sm font-bold text-green-800">✅ 是正案が承認されました</span>
-          </div>
-          <div className="p-5">
-            <p className="text-sm text-gray-600 mb-3">最終改善報告書を作成してください。</p>
-            <textarea
-              value={improvementReport}
-              onChange={e => setImprovementReport(e.target.value)}
-              rows={5}
-              placeholder="今回のクレーム対応を通じて、何を学び、今後どう活かすかを記述してください"
-              className="w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition resize-none mb-3"
-            />
-            <button onClick={handleSubmitImprovementReport} disabled={saving || !improvementReport.trim()}
-              className="w-full py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm transition-colors disabled:opacity-40">
-              改善報告書を提出する
-            </button>
-          </div>
+        <div className="bg-green-50 border border-green-200 rounded-2xl p-5 mb-4">
+          <p className="text-sm text-green-800 leading-relaxed mb-4">
+            ✅ 是正案が承認されました。現場での是正処置が完了したら、是正報告書を作成してください。
+          </p>
+          <button onClick={() => navigate(`/complaints/${id}/correction`)}
+            className="w-full py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm transition-colors shadow-sm">
+            是正報告書を作成する →
+          </button>
         </div>
       )}
     </div>

@@ -1,4 +1,5 @@
 {
+  "toolbar": { "enabled": false },
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]

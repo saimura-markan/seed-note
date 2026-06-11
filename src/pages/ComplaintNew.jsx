@@ -133,7 +133,7 @@ export default function ComplaintNew() {
               </div>
             </div>
             <div>
-              <label className={label}>施工担当者名</label>
+              <label className={label}>現場作業者名</label>
               <input value={form.workerName} onChange={e => set('workerName', e.target.value)}
                 className={input + ' max-w-xs'} placeholder="中村 太郎" />
             </div>

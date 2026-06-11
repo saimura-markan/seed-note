@@ -41,7 +41,7 @@ export default function Login({ onLogin }) {
       ══════════════════════════════════════════════════════ */}
       <div
         className="hidden md:flex md:w-[65%] relative flex-col overflow-hidden"
-        style={{ backgroundImage: 'url(/seed-note-bg.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}
+        style={{ backgroundImage: 'url(/seed-note-bg.png)', backgroundSize: 'cover', backgroundPosition: 'bottom' }}
       >
         <div className="relative z-10 flex flex-col h-full px-14 py-12">
 

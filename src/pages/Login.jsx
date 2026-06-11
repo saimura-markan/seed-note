@@ -45,13 +45,9 @@ export default function Login({ onLogin }) {
       >
         <div className="relative z-10 flex flex-col h-full px-14 pt-8 pb-56 justify-between">
 
-          {/* ── ロゴ（上部・横並び） ── */}
-          <div className="flex items-center gap-3">
-            <img src="/seed-note-logo.png" alt="Seed Note" className="h-16 w-auto" style={{ mixBlendMode: 'multiply' }} />
-            <div>
-              <p className="text-2xl font-bold leading-tight" style={{ color: '#1a4731' }}>Seed Note</p>
-              <p className="text-sm tracking-[0.15em]" style={{ color: '#16a34a' }}>── シードノート ──</p>
-            </div>
+          {/* ── ロゴ（上部） ── */}
+          <div>
+            <img src="/seed-note-logo.png" alt="Seed Note" className="h-20 w-auto" style={{ mixBlendMode: 'multiply' }} />
           </div>
 
           {/* ── 中央コンテンツ ── */}

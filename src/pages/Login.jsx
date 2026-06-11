@@ -47,7 +47,7 @@ export default function Login({ onLogin }) {
 
           {/* ── ロゴ（上部） ── */}
           <div>
-            <img src="/seed-note-logo.png" alt="Seed Note" className="h-20 w-auto" style={{ mixBlendMode: 'multiply' }} />
+            <img src="/seed-note-logo.png" alt="Seed Note" className="h-40 w-auto" style={{ mixBlendMode: 'multiply' }} />
           </div>
 
           {/* ── 中央コンテンツ ── */}

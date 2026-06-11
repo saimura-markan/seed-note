@@ -43,15 +43,15 @@ export default function Login({ onLogin }) {
         className="hidden md:flex md:w-[65%] relative flex-col overflow-hidden"
         style={{ backgroundImage: 'url(/seed-note-bg.png)', backgroundSize: 'cover', backgroundPosition: 'bottom' }}
       >
-        <div className="relative z-10 flex flex-col h-full px-14 py-12">
+        <div className="relative z-10 flex flex-col h-full px-14 pt-8 pb-48 justify-between">
 
-          {/* ── ロゴ ── */}
-          <div className="mb-12 -ml-14">
+          {/* ── ロゴ（上部固定） ── */}
+          <div className="-ml-14">
             <img src="/seed-note-logo.png" alt="Seed Note" className="h-40 w-auto" style={{ mixBlendMode: 'multiply' }} />
           </div>
 
-          {/* ── コンテンツ中央 ── */}
-          <div className="flex-1 flex flex-col justify-center">
+          {/* ── 中央コンテンツ ── */}
+          <div>
 
             {/* バッジ */}
             <div className="inline-flex items-center gap-1.5 mb-6 px-3 py-1.5 rounded-full border border-green-200 bg-white/60 w-fit shadow-sm">
@@ -66,14 +66,14 @@ export default function Login({ onLogin }) {
               クレームは、<br />
               <span className="font-extrabold" style={{ color: '#16a34a' }}>成長の種。</span>
             </h1>
-            <p className="text-base font-medium mb-10 text-gray-700">
+            <p className="text-base font-medium mb-8 text-gray-700">
               記録し、分析し、組織を育てる。
             </p>
 
             {/* 機能カード 4枚 */}
-            <div className="grid grid-cols-4 gap-3 mb-10">
+            <div className="grid grid-cols-4 gap-3">
               {FEATURES.map(({ icon: Icon, label, desc }) => (
-                <div key={label} className="bg-white rounded-xl px-3 py-4 text-center shadow-sm">
+                <div key={label} className="bg-white rounded-xl px-3 py-2 text-center shadow-sm">
                   <div className="w-10 h-10 bg-green-100 rounded-full mx-auto mb-2 flex items-center justify-center">
                     <Icon size={18} className="text-green-600" />
                   </div>

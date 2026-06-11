@@ -149,7 +149,7 @@ export default function ComplaintNew() {
       </div>
 
       {/* ══════════ フォーム ══════════ */}
-      <div className="max-w-2xl mx-auto px-6 pt-6">
+      <div className="max-w-none px-8 pt-6">
         <h2 className="text-lg font-bold text-gray-900 mb-1">新規クレーム受付</h2>
         <p className="text-xs text-gray-400 mb-5">正確・迅速に記録してください。</p>
 
@@ -157,10 +157,25 @@ export default function ComplaintNew() {
 
           {/* 受付日時 */}
           <div className="bg-white rounded-2xl p-5 shadow-sm">
-            <p className={labelCls}>受付日時</p>
-            <p className="text-sm font-mono text-gray-700 bg-stone-50 rounded-xl px-4 py-2.5 border border-stone-200">
-              {receivedAt.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-            </p>
+            <div className="flex items-center gap-2 mb-3">
+              <p className={labelCls + ' mb-0'}>受付日時</p>
+              <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                自動入力
+              </span>
+            </div>
+            <div className="inline-flex items-center gap-3 bg-white border border-stone-200 rounded-xl px-6 py-3 w-fit">
+              <svg width="20" height="24" viewBox="0 0 20 24" fill="none">
+                <line x1="10" y1="22" x2="10" y2="12" stroke="#16a34a" strokeWidth="1.5" strokeLinecap="round"/>
+                <ellipse cx="5.5" cy="9.5" rx="5.5" ry="3.5" transform="rotate(-15 5.5 9.5)" fill="#4ade80"/>
+                <ellipse cx="14.5" cy="9.5" rx="5.5" ry="3.5" transform="rotate(15 14.5 9.5)" fill="#22c55e"/>
+              </svg>
+              <p className="text-xl font-medium text-gray-800 tabular-nums">
+                {receivedAt.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' })}
+                {'　'}
+                {receivedAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </p>
+            </div>
           </div>
 
           {/* 基本情報 */}
@@ -332,7 +347,7 @@ export default function ComplaintNew() {
 
       {/* ══════════ 固定フッターボタン ══════════ */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200 px-6 py-4 z-20">
-        <div className="max-w-2xl mx-auto flex gap-3">
+        <div className="max-w-none px-2 flex gap-3">
           <button type="button" onClick={handleClear}
             className="flex items-center gap-1.5 px-5 h-12 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50 transition-colors">
             <X size={14} /> クリア

@@ -25,11 +25,14 @@ const LEVEL_COLOR = {
   5: { active: '#dc2626', light: '#fef2f2', border: '#fecaca', label: 'text-red-700' },
 }
 
+// 部署 → デフォルト担当者（手動変更可）
 const DEPARTMENTS = {
-  '解体': ['中村 太郎', '大林 次郎', '井上 三郎', '山田 四郎'],
-  '産廃': ['藤本 五郎', '森 六郎', '田村 七郎', '松本 八郎'],
-  '養生': ['佐藤 美咲', '斎藤 花子', '岡田 由紀', '渡辺 幸子'],
-  '清掃': ['田中 健太', '鈴木 一郎', '高橋 二郎', '伊藤 三郎'],
+  '清掃部 清掃１課':  '井上参事',
+  '清掃部 清掃２課':  '備主任',
+  '工事部 解体課':    '松木主任',
+  '工事部 産廃課':    '新田主任',
+  '環境リサイクル部': '岡橋次長',
+  '本部':            '榮藤取締役',
 }
 
 const INITIAL_FORM = {
@@ -56,6 +59,17 @@ export default function ComplaintNew() {
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(t)
+  }, [])
+
+  // ログイン中ユーザーのfull_nameを受付者名に自動入力
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data }) => {
+      const userId = data.session?.user?.id
+      if (!userId) return
+      const { data: profile } = await supabase
+        .from('profiles').select('full_name').eq('id', userId).maybeSingle()
+      if (profile?.full_name) set('receiverName', profile.full_name)
+    })
   }, [])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -104,7 +118,6 @@ export default function ComplaintNew() {
   const isUrgent      = remainingMs < 5 * 60 * 1000
   const isExpired     = remainingMs === 0
 
-  const assigneeOptions = DEPARTMENTS[form.department] || []
   const lc = LEVEL_COLOR[form.emotionLevel]
 
   return (
@@ -283,26 +296,34 @@ export default function ComplaintNew() {
               <div>
                 <label className={labelCls}>担当部署</label>
                 <select value={form.department}
-                  onChange={e => { set('department', e.target.value); set('assignee', '') }}
+                  onChange={e => {
+                    const dept = e.target.value
+                    set('department', dept)
+                    set('assignee', DEPARTMENTS[dept] || '')
+                  }}
                   className={inputCls + ' bg-white'}>
                   <option value="">選択してください</option>
                   {Object.keys(DEPARTMENTS).map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
               </div>
               <div>
-                <label className={labelCls}>担当者</label>
-                <select value={form.assignee} onChange={e => set('assignee', e.target.value)}
-                  disabled={!form.department}
-                  className={inputCls + ' bg-white disabled:opacity-40 disabled:cursor-not-allowed'}>
-                  <option value="">{form.department ? '選択してください' : '部署を選択してください'}</option>
-                  {assigneeOptions.map(a => <option key={a} value={a}>{a}</option>)}
-                </select>
+                <label className={labelCls}>
+                  担当者
+                  {form.department && (
+                    <span className="ml-1.5 text-[10px] font-normal text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">自動入力・変更可</span>
+                  )}
+                </label>
+                <input value={form.assignee} onChange={e => set('assignee', e.target.value)}
+                  className={inputCls} placeholder="部署を選択すると自動入力されます" />
               </div>
             </div>
             <div>
-              <label className={labelCls}>受付者名</label>
-              <input value={form.receiverName} onChange={e => set('receiverName', e.target.value)}
-                className={inputCls + ' max-w-xs'} placeholder="品質管理部 鈴木" />
+              <label className={labelCls}>
+                受付者名
+                <span className="ml-1.5 text-[10px] font-normal text-gray-400 bg-stone-100 px-1.5 py-0.5 rounded-full">自動入力</span>
+              </label>
+              <input value={form.receiverName} readOnly
+                className={inputCls + ' max-w-xs bg-stone-50 text-gray-500 cursor-default'} />
             </div>
           </div>
 

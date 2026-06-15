@@ -4,53 +4,8 @@ import { ArrowLeft, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 
-const ROOT_THEMES = ['標準化不足', '教育不足', '報告不足', '顧客視点不足', 'その他']
-
-const STEPS = ['受付済', '対応中', '是正案', '改善報告', '深掘り', '承認完了']
-
-function statusToStep(status) {
-  const map = {
-    '受付済': 0, '対応中': 1,
-    '是正案提出': 2, '是正案差し戻し': 2,
-    '是正案承認': 3, '改善報告書提出': 3,
-    '深掘り提出': 4, '承認完了': 5,
-  }
-  return map[status] ?? 0
-}
-
-function ProgressBar({ status }) {
-  const step = statusToStep(status)
-  return (
-    <div className="bg-white rounded-2xl shadow-sm px-6 py-4 mb-5">
-      <div className="flex items-center gap-0">
-        {STEPS.map((s, i) => {
-          const done = i < step; const current = i === step
-          return (
-            <div key={s} className="flex items-center flex-1 min-w-0">
-              <div className="flex flex-col items-center shrink-0">
-                <div className={cn(
-                  'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all',
-                  done    ? 'bg-emerald-600 border-emerald-600 text-white' :
-                  current ? 'bg-white border-emerald-600 text-emerald-700 ring-2 ring-emerald-200' :
-                  'bg-white border-stone-200 text-stone-400'
-                )}>
-                  {done ? '✓' : i + 1}
-                </div>
-                <span className={cn('text-[10px] mt-1 text-center leading-tight whitespace-nowrap',
-                  current ? 'text-emerald-700 font-bold' : done ? 'text-emerald-500' : 'text-stone-400')}>
-                  {s}
-                </span>
-              </div>
-              {i < STEPS.length - 1 && (
-                <div className={cn('flex-1 h-0.5 mx-1 mt-[-14px]', done ? 'bg-emerald-500' : 'bg-stone-200')} />
-              )}
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
+const ROOT_THEMES  = ['教育不足', '標準化不足', 'ルール未整備', 'システム不備', '顧客確認不足', '引継ぎ不足', 'マネジメント不足', '人員配置問題']
+const DEPARTMENTS  = ['解体部', '養生部', '産廃部', '清掃部', '事務']
 
 function fmtDateTime(iso) {
   if (!iso) return '—'
@@ -72,22 +27,86 @@ export default function DeepAnalysisForm() {
   const { id } = useParams()
   const navigate = useNavigate()
 
-  const [complaint,          setComplaint]          = useState(null)
-  const [correction,         setCorrection]         = useState(null)
-  const [contactLogs,        setContactLogs]        = useState([])
-  const [hearingText,        setHearingText]        = useState('')
-  const [reportLog,          setReportLog]          = useState(null)
-  const [supervisorComment,  setSupervisorComment]  = useState('')
-  const [approving,          setApproving]          = useState(false)
+  const [complaint,             setComplaint]             = useState(null)
+  const [correction,            setCorrection]            = useState(null)
+  const [contactLogs,           setContactLogs]           = useState([])
+  const [hearingText,           setHearingText]           = useState('')
+  const [reportLog,             setReportLog]             = useState(null)
+  const [supervisorComment,     setSupervisorComment]     = useState('')
+  const [supervisorCommentLogs, setSupervisorCommentLogs] = useState([])
+  const [newComment,            setNewComment]            = useState('')
+  const [sendingComment,        setSendingComment]        = useState(false)
+  const [approving,             setApproving]             = useState(false)
 
-  const [existing,   setExisting]   = useState(null)
-  const [rootCause,  setRootCause]  = useState('')
-  const [horizontal, setHorizontal] = useState('')
-  const [orgImprove, setOrgImprove] = useState('')
-  const [rootTheme,  setRootTheme]  = useState('')
-  const [submitting, setSubmitting] = useState(false)
+  // 深掘りフォーム
+  const [existing,       setExisting]       = useState(null)
+  const [rootCause,      setRootCause]      = useState('')
+  const [orgImprove,     setOrgImprove]     = useState('')
+  const [rootTheme,      setRootTheme]      = useState('')
+  const [rootDetail,     setRootDetail]     = useState('')
+  // 横展開
+  const [horizDepts,     setHorizDepts]     = useState([])
+  const [horizContent,   setHorizContent]   = useState('')
+  // 真因対策
+  const [actionAssignee, setActionAssignee] = useState('')
+  const [actionDeadline, setActionDeadline] = useState('')
+  const [actionProgress, setActionProgress] = useState('未着手')
+  const [submitting,     setSubmitting]     = useState(false)
   const [loading,    setLoading]    = useState(true)
   const [, setTick]                 = useState(0)
+
+  // ソクラテス対話（真因）
+  // phase: q1 | q2 | final_check | retry | complete
+  const [rootPhase,   setRootPhase]   = useState('q1')
+  const [rootAnswers, setRootAnswers] = useState({ q1: '', q2: '', retry: '' })
+  const [rootInputs,  setRootInputs]  = useState({ q1: '', q2: '', retry: '' })
+
+  const setRootInput = (key, val) => setRootInputs(prev => ({ ...prev, [key]: val }))
+
+  const submitRootQ1 = () => {
+    if (!rootInputs.q1.trim()) return
+    setRootAnswers(prev => ({ ...prev, q1: rootInputs.q1.trim() }))
+    setRootPhase('q2')
+  }
+  const editRootQ1 = () => {
+    setRootInputs(prev => ({ ...prev, q1: rootAnswers.q1, q2: '', retry: '' }))
+    setRootAnswers({ q1: '', q2: '', retry: '' })
+    setRootPhase('q1')
+  }
+  const submitRootQ2 = () => {
+    if (!rootInputs.q2.trim()) return
+    setRootAnswers(prev => ({ ...prev, q2: rootInputs.q2.trim() }))
+    setRootPhase('final_check')
+  }
+  const editRootQ2 = () => {
+    setRootInputs(prev => ({ ...prev, q2: rootAnswers.q2, retry: '' }))
+    setRootAnswers(prev => ({ ...prev, q2: '', retry: '' }))
+    setRootPhase('q2')
+  }
+  const handleRootFinalYes = () => {
+    const parts = []
+    if (rootAnswers.q1) parts.push(rootAnswers.q1)
+    if (rootAnswers.q2) parts.push(rootAnswers.q2)
+    if (rootAnswers.retry) parts.push(rootAnswers.retry)
+    setRootCause(parts.join('\n'))
+    setRootPhase('complete')
+  }
+  const submitRootRetry = () => {
+    if (!rootInputs.retry.trim()) return
+    setRootAnswers(prev => ({ ...prev, retry: rootInputs.retry.trim() }))
+    setRootPhase('final_check')
+  }
+
+  // 改善報告書の承認/否認
+  const [correctionApproved,  setCorrectionApproved]  = useState(false)
+  const [showCorrReject,      setShowCorrReject]       = useState(false)
+  const [corrRejectReason,    setCorrRejectReason]     = useState('')
+  const [corrRejecting,       setCorrRejecting]        = useState(false)
+
+  // 深掘り分析の承認/否認
+  const [showDeepReject, setShowDeepReject] = useState(false)
+  const [deepRejectReason, setDeepRejectReason] = useState('')
+  const [deepActing, setDeepActing] = useState(false)
 
   useEffect(() => {
     const t = setInterval(() => setTick(n => n + 1), 1000)
@@ -108,97 +127,127 @@ export default function DeepAnalysisForm() {
       if (h) setHearingText(h.content)
       const r = logs.filter(l => l.type === 'report').pop()
       if (r) setReportLog(r)
+      setSupervisorCommentLogs(logs.filter(l => l.type === 'supervisor_comment'))
     }
     if (corr && corr[0]) setCorrection(corr[0])
     if (deep && deep[0]) {
       setExisting(deep[0])
       setRootCause(deep[0].root_cause || '')
-      setHorizontal(deep[0].horizontal_expansion || '')
       setOrgImprove(deep[0].org_improvement || '')
       setRootTheme(deep[0].root_theme || '')
+      setRootDetail(deep[0].root_detail || '')
+      setHorizDepts(Array.isArray(deep[0].horizontal_departments) ? deep[0].horizontal_departments : [])
+      setHorizContent(deep[0].horizontal_content || '')
+      setActionAssignee(deep[0].action_assignee || '')
+      setActionDeadline(deep[0].action_deadline || '')
+      setActionProgress(deep[0].action_progress || '未着手')
     }
     setLoading(false)
   }, [id])
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  // 承認
+  // ── 是正案 承認 ──
   const handleApprove = async () => {
     setApproving(true)
     const now = new Date().toISOString()
-    const { data, error } = await supabase.from('complaints').update({
-      status: '是正案承認',
-      supervisor_approved_at: now,
-      supervisor_comment: supervisorComment,
-    }).eq('id', id).select()
-    console.log('[handleApprove] result:', { data, error })
-    if (error) {
-      alert(`承認に失敗しました: ${error.message}`)
+    const commentContent = supervisorComment.trim() || '承認'
+
+    if (complaint.judgment === '手直し') {
+      const { error } = await supabase.from('complaints').update({
+        status: '改善報告書提出', supervisor_approved_at: now, supervisor_comment: supervisorComment,
+      }).eq('id', id)
+      if (error) { setApproving(false); alert(`承認に失敗しました: ${error.message}`); return }
+      const { error: e } = await supabase.from('complaint_logs').insert({ complaint_id: id, type: 'supervisor_comment', content: commentContent })
+      if (e) console.error('[handleApprove 手直し]', e.message)
       setApproving(false)
+      navigate(`/complaints/${id}`)
       return
     }
+
+    const { error } = await supabase.from('complaints').update({
+      status: '是正案承認', supervisor_approved_at: now, supervisor_comment: supervisorComment,
+    }).eq('id', id)
+    if (error) { alert(`承認に失敗しました: ${error.message}`); setApproving(false); return }
+    const { error: e } = await supabase.from('complaint_logs').insert({ complaint_id: id, type: 'supervisor_comment', content: commentContent })
+    if (e) console.error('[handleApprove]', e.message)
     setApproving(false)
     await fetchData()
   }
 
-  // 否認（差し戻し）
+  // ── 是正案 否認 ──
   const handleReject = async () => {
-    if (!supervisorComment.trim()) {
-      alert('差し戻しコメントを入力してください')
-      return
-    }
+    if (!supervisorComment.trim()) { alert('差し戻しコメントを入力してください'); return }
     setApproving(true)
-    const { data, error } = await supabase.from('complaints').update({
-      status: '是正案差し戻し',
-      supervisor_comment: supervisorComment,
-    }).eq('id', id).select()
-    console.log('[handleReject] result:', { data, error })
-    if (error) {
-      alert(`差し戻しに失敗しました: ${error.message}`)
-      setApproving(false)
-      return
-    }
+    const { error } = await supabase.from('complaints').update({ status: '是正案差し戻し', supervisor_comment: supervisorComment }).eq('id', id)
+    if (error) { alert(`差し戻しに失敗しました: ${error.message}`); setApproving(false); return }
+    const { error: e } = await supabase.from('complaint_logs').insert({ complaint_id: id, type: 'supervisor_comment', content: `差し戻し: ${supervisorComment.trim()}` })
+    if (e) console.error('[handleReject]', e.message)
     setApproving(false)
     await fetchData()
   }
 
-  const canSubmit = rootCause.trim() && horizontal.trim() && orgImprove.trim() && rootTheme
+  // ── 改善報告書 否認 ──
+  const handleCorrectionReject = async () => {
+    if (!corrRejectReason.trim()) return
+    setCorrRejecting(true)
+    await supabase.from('complaint_logs').insert({ complaint_id: id, type: 'correction_rejected', content: corrRejectReason.trim() })
+    await supabase.from('complaints').update({ status: 'correction_rejected' }).eq('id', id)
+    setCorrRejecting(false)
+    navigate(`/complaints/${id}`)
+  }
+
+  // ── 深掘り分析 提出 ──
+  const canSubmit = rootCause.trim() && orgImprove.trim() && rootTheme && rootDetail.trim()
+    && horizDepts.length > 0 && horizContent.trim()
+    && actionAssignee.trim() && actionDeadline
 
   const handleSubmit = async () => {
     if (!canSubmit) return
     setSubmitting(true)
     const payload = {
-      complaint_id:         id,
-      root_cause:           rootCause,
-      horizontal_expansion: horizontal,
-      org_improvement:      orgImprove,
-      root_theme:           rootTheme,
+      complaint_id: id,
+      root_cause: rootCause, org_improvement: orgImprove, root_theme: rootTheme, root_detail: rootDetail,
+      horizontal_departments: horizDepts, horizontal_content: horizContent,
+      action_assignee: actionAssignee, action_deadline: actionDeadline || null, action_progress: actionProgress,
     }
     if (existing) {
       await supabase.from('complaint_deep_analysis').update(payload).eq('id', existing.id)
     } else {
       await supabase.from('complaint_deep_analysis').insert(payload)
     }
-
     const APPROVERS = [
       { approver_name: '山口 誠',   approver_role: '代表取締役',           sort_order: 0 },
       { approver_name: '佐々木 隆', approver_role: '取締役 工事部長',      sort_order: 1 },
       { approver_name: '川上 直美', approver_role: '取締役 品質管理責任者', sort_order: 2 },
     ]
-    const { data: existingApprovals } = await supabase
-      .from('complaint_approvals').select('id').eq('complaint_id', id)
+    const { data: existingApprovals } = await supabase.from('complaint_approvals').select('id').eq('complaint_id', id)
     if (!existingApprovals || existingApprovals.length === 0) {
-      await supabase.from('complaint_approvals').insert(
-        APPROVERS.map(a => ({ complaint_id: id, ...a, status: 'pending' }))
-      )
+      await supabase.from('complaint_approvals').insert(APPROVERS.map(a => ({ complaint_id: id, ...a, status: 'pending' })))
     }
-
     await supabase.from('complaints').update({ status: '深掘り提出' }).eq('id', id)
     setSubmitting(false)
-    navigate(`/complaints/${id}/approval`)
+    await fetchData()
   }
 
-  const handleClear = () => { setRootCause(''); setHorizontal(''); setOrgImprove(''); setRootTheme('') }
+  // ── 深掘り分析 承認（合同改善報告書として役員へ） ──
+  const handleDeepApprove = async () => {
+    setDeepActing(true)
+    await supabase.from('complaint_logs').insert({ complaint_id: id, type: 'deep_approved', content: '合同改善報告書を役員に提出しました' })
+    setDeepActing(false)
+    navigate(`/complaints/${id}`)
+  }
+
+  // ── 是正案承認済み コメント追加 ──
+  const handleSupervisorComment = async () => {
+    if (!newComment.trim()) return
+    setSendingComment(true)
+    const { data, error } = await supabase.from('complaint_logs').insert({ complaint_id: id, type: 'supervisor_comment', content: newComment.trim() }).select().single()
+    setSendingComment(false)
+    if (error) { alert(`送信に失敗しました: ${error.message}`); return }
+    if (data) setSupervisorCommentLogs(prev => [...prev, data])
+    setNewComment('')
+  }
 
   if (loading) return (
     <div className="flex items-center justify-center py-32 text-gray-400">
@@ -214,223 +263,609 @@ export default function DeepAnalysisForm() {
   const guideCls = 'text-xs text-gray-400 mb-2 italic'
   const isApprovalPhase = ['是正案提出', '是正案差し戻し'].includes(complaint.status)
 
+  // タイマー（改善報告書の提出日時から24時間）
+  const timerBase = correction?.created_at || complaint.supervisor_reported_at
+  const TimerBanner = timerBase ? (() => {
+    const deadline = new Date(timerBase).getTime() + 24 * 60 * 60 * 1000
+    const remaining = Math.floor((deadline - Date.now()) / 1000)
+    const pad = n => String(Math.floor(Math.abs(n))).padStart(2, '0')
+    if (remaining <= 0) {
+      const over = -remaining
+      return (
+        <div className="flex items-center gap-3 bg-red-50 border border-red-300 rounded-2xl px-5 py-3 mb-5">
+          <AlertTriangle size={16} className="text-red-600 shrink-0" />
+          <span className="text-xs font-semibold text-red-700">提出期限超過</span>
+          <span className="text-lg font-black tabular-nums text-red-700">
+            +{pad(over / 3600)}:{pad((over % 3600) / 60)}:{pad(over % 60)}
+          </span>
+        </div>
+      )
+    }
+    const h = pad(remaining / 3600); const m = pad((remaining % 3600) / 60); const s = pad(remaining % 60)
+    const isRed = remaining < 6 * 3600; const isOrange = !isRed && remaining < 12 * 3600
+    const bg    = isRed ? 'bg-red-50 border-red-300' : isOrange ? 'bg-orange-50 border-orange-300' : 'bg-amber-50 border-amber-200'
+    const label = isRed ? 'text-red-700' : isOrange ? 'text-orange-700' : 'text-amber-700'
+    const value = isRed ? 'text-red-700' : isOrange ? 'text-orange-800' : 'text-amber-800'
+    return (
+      <div className={`flex items-center gap-3 border rounded-2xl px-5 py-3 mb-5 ${bg}`}>
+        {isRed && <AlertTriangle size={16} className="text-red-600 shrink-0" />}
+        <span className={`text-xs font-semibold ${label}`}>{isRed ? '⚠️ 残り時間わずか' : isOrange ? '注意：残り時間' : '提出期限まで'}</span>
+        <span className={`text-lg font-black tabular-nums ${value}`}>残り {h}:{m}:{s}</span>
+      </div>
+    )
+  })() : null
+
   return (
-    <div className="px-6 py-6 max-w-3xl mx-auto">
+    <div className="px-6 py-6 max-w-6xl mx-auto">
       <button onClick={() => navigate(`/complaints/${id}`)}
         className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 mb-5 transition-colors">
-        <ArrowLeft size={15} /> 概要に戻る
+        <ArrowLeft size={15} /> クレーム詳細に戻る
       </button>
 
-      <ProgressBar status={complaint.status} />
-
-      {/* 24時間カウントダウンタイマー */}
-      {complaint.supervisor_reported_at && (() => {
-        const deadline = new Date(complaint.supervisor_reported_at).getTime() + 24 * 60 * 60 * 1000
-        const remaining = Math.floor((deadline - Date.now()) / 1000)
-        const pad = n => String(Math.floor(Math.abs(n))).padStart(2, '0')
-        if (remaining <= 0) {
-          const over = -remaining
-          return (
-            <div className="flex items-center gap-3 bg-red-50 border border-red-300 rounded-2xl px-5 py-3 mb-5">
-              <AlertTriangle size={16} className="text-red-600 shrink-0" />
-              <span className="text-xs font-semibold text-red-700">提出期限</span>
-              <span className="text-lg font-black tabular-nums text-red-700">
-                期限超過 +{pad(over / 3600)}:{pad((over % 3600) / 60)}:{pad(over % 60)}
-              </span>
-            </div>
-          )
-        }
-        const h = pad(remaining / 3600); const m = pad((remaining % 3600) / 60); const s = pad(remaining % 60)
-        const isRed = remaining < 6 * 3600; const isOrange = !isRed && remaining < 12 * 3600
-        const bg    = isRed ? 'bg-red-50 border-red-300'    : isOrange ? 'bg-orange-50 border-orange-300' : 'bg-amber-50 border-amber-200'
-        const label = isRed ? 'text-red-700'                : isOrange ? 'text-orange-700'                : 'text-amber-700'
-        const value = isRed ? 'text-red-700'                : isOrange ? 'text-orange-800'               : 'text-amber-800'
-        const icon  = isRed ? <AlertTriangle size={16} className="text-red-600 shrink-0" /> : null
-        return (
-          <div className={`flex items-center gap-3 border rounded-2xl px-5 py-3 mb-5 ${bg}`}>
-            {icon}
-            <span className={`text-xs font-semibold ${label}`}>
-              {isRed ? '⚠️ 残り時間わずか' : isOrange ? '注意：残り時間' : '提出期限まで'}
-            </span>
-            <span className={`text-lg font-black tabular-nums ${value}`}>残り {h}:{m}:{s}</span>
-          </div>
-        )
-      })()}
+      {TimerBanner}
 
       {/* ヘッダー */}
-      <div className="bg-white rounded-2xl shadow-sm p-5 mb-5">
-        <p className="text-lg font-bold text-gray-900 mb-0.5">
-          {isApprovalPhase ? '✅ 是正案の確認・承認' : '🔍 深掘り・学習'}
-        </p>
-        <p className="text-sm text-gray-500">{complaint.client_name} — {complaint.site_name}</p>
-      </div>
+      {!(isApprovalPhase && complaint.judgment === '手直し') && (
+        <div className="bg-white rounded-2xl shadow-sm p-5 mb-5">
+          <p className="text-lg font-bold text-gray-900 mb-0.5">
+            {isApprovalPhase ? '✅ 是正案の確認・承認'
+              : (complaint.status === '改善報告書提出' || (complaint.status === '是正案承認' && correction)) ? '📋 改善報告書（現象原因の特定）の確認・深掘り分析'
+              : complaint.status === '深掘り提出' ? '🔍 深掘り分析の確認'
+              : '🔍 深掘り・学習'}
+          </p>
+          <p className="text-sm text-gray-500">{complaint.client_name} — {complaint.site_name}</p>
+        </div>
+      )}
 
-      {/* ── 承認フェーズ（是正案提出 / 是正案差し戻し） ── */}
+      {/* ── 是正案承認フェーズ ── */}
       {isApprovalPhase && (
         <>
-          {/* 注意バナー */}
-          <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-5">
-            <AlertTriangle size={16} className="text-amber-600 mt-0.5 shrink-0" />
-            <p className="text-sm text-amber-800 leading-relaxed">
-              テキストだけでは伝わらない部分があります。<strong>必ず管理者と直接会話・電話で状況を確認してから</strong>判断してください。
-            </p>
-          </div>
-
-          {/* ① 管理者の是正案（読み取り専用） */}
-          <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-stone-100 bg-stone-50">
-              <span className="text-sm font-bold text-gray-700">① 管理者の是正案</span>
-            </div>
-            <div className="p-5">
-              <div className="mb-3">
-                <p className="text-xs font-semibold text-gray-500 mb-2">お客様への連絡記録</p>
-                {contactLogs.length === 0
-                  ? <p className="text-sm text-gray-400 italic">記録なし</p>
-                  : contactLogs.map(log => (
-                    <div key={log.id} className={cn('flex items-center gap-2 text-sm px-3 py-2 rounded-lg mb-1',
-                      log.content === '繋がらず' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-800')}>
-                      <span>{log.content === '繋がらず' ? '🔴' : '✅'}</span>
-                      <span className="flex-1">{log.content}</span>
-                      <span className="text-xs text-gray-400">{fmtDateTime(log.created_at)}</span>
-                    </div>
-                  ))
-                }
-              </div>
-              <ReadRow label="作業者からの聞き取り" value={hearingText} />
-              {correction && (
-                <>
-                  <ReadRow label="直接原因" value={correction.direct_cause} />
-                  <ReadRow label="是正処置" value={correction.correction} />
-                  <ReadRow label="運用改善案" value={correction.improvement} />
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* 管理者からの報告 */}
-          {complaint.judgment && (
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl mb-4 overflow-hidden">
-              <div className="px-5 py-3.5 border-b border-amber-200">
-                <span className="text-sm font-bold text-amber-900">📋 管理者からの報告</span>
-              </div>
-              <div className="p-5 space-y-3">
-                <p className="text-sm font-semibold text-amber-800">
-                  {complaint.judgment === '手直し' ? '手直しで対応します' : '事業責任者へ確認'}
+          {complaint.judgment !== '手直し' && (
+            <>
+              <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-5">
+                <AlertTriangle size={16} className="text-amber-600 mt-0.5 shrink-0" />
+                <p className="text-sm text-amber-800 leading-relaxed">
+                  テキストだけでは伝わらない部分があります。<strong>必ず管理者と直接会話・電話で状況を確認してから</strong>判断してください。
                 </p>
-                {reportLog && (
-                  <div className="bg-white rounded-xl px-4 py-3 text-sm text-gray-700 border border-amber-100 leading-relaxed">
-                    {reportLog.content}
-                  </div>
-                )}
               </div>
-            </div>
+
+              <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-stone-100 bg-stone-50">
+                  <span className="text-sm font-bold text-gray-700">① 管理者の是正案</span>
+                </div>
+                <div className="p-5">
+                  <div className="mb-3">
+                    <p className="text-xs font-semibold text-gray-500 mb-2">お客様への連絡記録</p>
+                    {contactLogs.length === 0
+                      ? <p className="text-sm text-gray-400 italic">記録なし</p>
+                      : contactLogs.map(log => (
+                        <div key={log.id} className={cn('flex items-center gap-2 text-sm px-3 py-2 rounded-lg mb-1',
+                          log.content === '繋がらず' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-800')}>
+                          <span>{log.content === '繋がらず' ? '🔴' : '✅'}</span>
+                          <span className="flex-1">{log.content}</span>
+                          <span className="text-xs text-gray-400">{fmtDateTime(log.created_at)}</span>
+                        </div>
+                      ))
+                    }
+                  </div>
+                  <ReadRow label="作業者からの聞き取り" value={hearingText} />
+                  {correction && (
+                    <>
+                      <ReadRow label="直接原因" value={correction.direct_cause} />
+                      <ReadRow label="是正処置" value={correction.correction} />
+                      <ReadRow label="運用改善案" value={correction.improvement} />
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {complaint.judgment && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl mb-4 overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-amber-200">
+                    <span className="text-sm font-bold text-amber-900">📋 管理者からの報告</span>
+                  </div>
+                  <div className="p-5 space-y-3">
+                    <p className="text-sm font-semibold text-amber-800">事業責任者へ確認</p>
+                    {reportLog && (
+                      <div className="bg-white rounded-xl px-4 py-3 text-sm text-gray-700 border border-amber-100 leading-relaxed">
+                        {reportLog.content}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
-          {/* ② 承認/否認 */}
           <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
             <div className="px-5 py-3.5 border-b border-stone-100">
-              <span className="text-sm font-bold text-gray-800">② 是正案の承認・否認</span>
+              <span className="text-sm font-bold text-gray-800">
+                {complaint.judgment === '手直し' ? '事業責任者コメント' : '② 是正案の承認・否認'}
+              </span>
             </div>
             <div className="p-5 space-y-3">
-              <div>
-                <label className={labelCls}>コメント（否認の場合は必須）</label>
-                <textarea value={supervisorComment} onChange={e => setSupervisorComment(e.target.value)}
-                  rows={3} placeholder="承認・否認の理由やフィードバックを記入してください"
-                  className={taCls} />
-              </div>
-              <div className="flex gap-3">
-                <button type="button" onClick={handleReject} disabled={approving}
-                  className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm transition-colors disabled:opacity-40">
-                  {approving ? '処理中...' : '否認（差し戻し）'}
-                </button>
-                <button type="button" onClick={handleApprove} disabled={approving}
-                  className="flex-1 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm transition-colors disabled:opacity-40">
-                  {approving ? '処理中...' : '承認'}
-                </button>
-              </div>
+              {complaint.judgment === '手直し' ? (
+                <>
+                  <div>
+                    <label className={labelCls}>コメント（任意）</label>
+                    <textarea value={supervisorComment} onChange={e => setSupervisorComment(e.target.value)}
+                      rows={3} placeholder="コメントを入力してください（任意）" className={taCls} />
+                  </div>
+                  <button type="button" onClick={handleApprove} disabled={approving}
+                    className="w-full py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm disabled:opacity-40">
+                    {approving ? '処理中...' : '送信'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className={labelCls}>コメント（否認の場合は必須）</label>
+                    <textarea value={supervisorComment} onChange={e => setSupervisorComment(e.target.value)}
+                      rows={3} placeholder="承認・否認の理由やフィードバックを記入してください" className={taCls} />
+                  </div>
+                  <div className="flex gap-3">
+                    <button type="button" onClick={handleReject} disabled={approving}
+                      className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm disabled:opacity-40">
+                      {approving ? '処理中...' : '否認（差し戻し）'}
+                    </button>
+                    <button type="button" onClick={handleApprove} disabled={approving}
+                      className="flex-1 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm disabled:opacity-40">
+                      {approving ? '処理中...' : '承認'}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </>
       )}
 
-      {/* 是正案承認済みバナー */}
-      {complaint.status === '是正案承認' && (
-        <div className="bg-green-50 border border-green-200 rounded-2xl px-5 py-4 mb-4 flex items-center gap-2">
-          <span className="text-green-700 font-bold text-sm">✅ 是正案を承認済み</span>
-          {complaint.supervisor_comment && (
-            <span className="text-xs text-green-600">— {complaint.supervisor_comment}</span>
-          )}
-        </div>
-      )}
-
-      {/* ── 深掘りフェーズ（改善報告書提出後） ── */}
-      {complaint.status === '改善報告書提出' && (
+      {/* ── 是正案承認済み：コメントセクション（改善報告書未提出の場合のみ） ── */}
+      {complaint.status === '是正案承認' && !correction && (
         <>
-          {/* 改善報告書 */}
-          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-4">
-            <p className="text-sm font-semibold text-blue-800">📋 改善報告書が提出されました。深掘り分析を行ってください。</p>
-            {complaint.improvement_report && (
-              <div className="mt-2 bg-white rounded-xl px-4 py-3 text-sm text-gray-700 border border-blue-100">
-                <p className="text-xs font-semibold text-blue-600 mb-1">管理者の改善報告書</p>
-                <p className="leading-relaxed">{complaint.improvement_report}</p>
-              </div>
+          <div className="bg-green-50 border border-green-200 rounded-2xl px-5 py-4 mb-4 flex items-center gap-2">
+            <span className="text-green-700 font-bold text-sm">✅ 是正案を承認済み</span>
+            {complaint.supervisor_comment && (
+              <span className="text-xs text-green-600">— {complaint.supervisor_comment}</span>
             )}
           </div>
-
-          {/* ③ 深掘り分析 */}
-          <div className="bg-white rounded-2xl shadow-sm mb-4 p-5 space-y-4">
-            <p className="text-sm font-bold text-gray-800">③ 深掘り分析</p>
-            <div>
-              <label className={labelCls}>真因 <span className="text-red-500">*</span></label>
-              <p className={guideCls}>なぜこの問題が起きたのか？組織・仕組みの観点から一言で</p>
-              <textarea value={rootCause} onChange={e => setRootCause(e.target.value)}
-                rows={3} placeholder="例：現場確認の責任者が明確でなく、個人の判断に委ねられていた"
-                className={taCls} />
+          <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-stone-100">
+              <span className="text-sm font-bold text-gray-800">事業責任者コメント</span>
             </div>
-            <div>
-              <label className={labelCls}>横展開 <span className="text-red-500">*</span></label>
-              <p className={guideCls}>他部署でも同じことが起きるとしたらどこか？</p>
-              <textarea value={horizontal} onChange={e => setHorizontal(e.target.value)}
-                rows={3} placeholder="例：産廃部門でも搬入前確認のチェックが属人化している可能性がある"
-                className={taCls} />
-            </div>
-            <div>
-              <label className={labelCls}>組織改善案 <span className="text-red-500">*</span></label>
-              <p className={guideCls}>会社として何を変えるか？</p>
-              <textarea value={orgImprove} onChange={e => setOrgImprove(e.target.value)}
-                rows={3} placeholder="例：全部署共通の作業前チェックリストを策定し、月次で見直す体制を設ける"
-                className={taCls} />
+            <div className="p-5 space-y-3">
+              {supervisorCommentLogs.length > 0 && (
+                <div className="space-y-2">
+                  {supervisorCommentLogs.map(log => (
+                    <div key={log.id} className="bg-stone-50 rounded-xl px-4 py-3">
+                      <p className="text-sm text-gray-700 leading-relaxed">{log.content}</p>
+                      <p className="text-xs text-gray-400 mt-1.5">{fmtDateTime(log.created_at)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div>
+                <label className={labelCls}>コメントを追加{supervisorCommentLogs.length === 0 ? '' : '（追記）'}</label>
+                <textarea value={newComment} onChange={e => setNewComment(e.target.value)}
+                  rows={3} placeholder="コメントを入力してください" className={taCls} />
+              </div>
+              <button type="button" onClick={handleSupervisorComment}
+                disabled={sendingComment || !newComment.trim()}
+                className="w-full py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm disabled:opacity-40">
+                {sendingComment ? '送信中...' : 'コメントを送信'}
+              </button>
             </div>
           </div>
+        </>
+      )}
 
-          {/* ④ 根源テーマの分類 */}
-          <div className="bg-white rounded-2xl shadow-sm mb-5 p-5">
-            <label className={labelCls}>④ 根源テーマの分類 <span className="text-red-500">*</span></label>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {ROOT_THEMES.map(theme => (
-                <button key={theme} type="button"
-                  onClick={() => setRootTheme(theme)}
-                  className={cn(
-                    'px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all',
-                    rootTheme === theme
-                      ? 'bg-emerald-700 text-white border-emerald-700'
-                      : 'bg-white text-gray-600 border-stone-200 hover:border-emerald-300 hover:bg-emerald-50'
-                  )}>
-                  {theme}
+      {/* ── 改善報告書提出フェーズ ── */}
+      {(complaint.status === '改善報告書提出' || (complaint.status === '是正案承認' && correction)) && (
+        <>
+          {/* 改善報告書の内容 */}
+          {correction && (
+            <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-stone-100 bg-stone-50">
+                <span className="text-sm font-bold text-gray-700">📋 改善報告書（現象原因の特定）の内容</span>
+                <span className="text-xs text-gray-400 ml-2">提出日時：{fmtDateTime(correction.created_at)}</span>
+              </div>
+              <div className="p-5">
+                <ReadRow label="直接原因" value={correction.direct_cause} />
+                <ReadRow label="是正処置" value={correction.correction} />
+                <ReadRow label="運用改善案" value={correction.improvement} />
+              </div>
+            </div>
+          )}
+
+          {/* 改善報告書の承認/否認 */}
+          {!correctionApproved && (
+            <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-stone-100">
+                <span className="text-sm font-bold text-gray-800">改善報告書（現象原因の特定）の確認</span>
+              </div>
+              <div className="p-5 space-y-3">
+                {!showCorrReject ? (
+                  <div className="flex gap-3">
+                    <button type="button" onClick={() => setShowCorrReject(true)}
+                      className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm">
+                      否認（やり直し）
+                    </button>
+                    <button type="button" onClick={() => setCorrectionApproved(true)}
+                      className="flex-1 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm">
+                      承認して深掘り分析へ →
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold text-red-700">否認の理由を入力してください（必須）</p>
+                    <textarea value={corrRejectReason} onChange={e => setCorrRejectReason(e.target.value)}
+                      rows={3} placeholder="管理者が3時間以内に修正を提出してください" className={taCls} />
+                    <div className="flex gap-3">
+                      <button type="button" onClick={() => setShowCorrReject(false)}
+                        className="flex-1 py-2.5 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50">
+                        キャンセル
+                      </button>
+                      <button type="button" onClick={handleCorrectionReject}
+                        disabled={corrRejecting || !corrRejectReason.trim()}
+                        className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold disabled:opacity-40">
+                        {corrRejecting ? '処理中...' : '否認して戻る'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 深掘り分析フォーム（承認後に表示） */}
+          {correctionApproved && (
+            <>
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-3 mb-5 flex items-center gap-2">
+                <span className="text-emerald-700 font-bold text-sm">✅ 改善報告書を承認しました。深掘り分析を入力してください。</span>
+              </div>
+
+              {/* ── 真因：ソクラテス対話 ── */}
+              <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden border-l-4 border-l-emerald-400">
+                <div className="px-5 py-3.5 border-b border-stone-100 bg-stone-50">
+                  <span className="text-sm font-bold text-gray-700">🤖 真因の深掘り</span>
+                </div>
+                <div className="p-5 space-y-5">
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    この問題の真因を考えてみましょう。個人の問題ではなく、<strong>仕組みや体制の観点</strong>で掘り下げていきます。
+                  </p>
+
+                  {/* Q1 */}
+                  <div>
+                    <p className="text-sm font-bold text-gray-800 mb-2">
+                      なぜ今回のようなことが起きたと思いますか？<br />
+                      <span className="text-xs font-normal text-gray-500">（個人ではなく、仕組みや体制の観点で）</span>
+                    </p>
+                    {rootPhase === 'q1' ? (
+                      <div className="space-y-2">
+                        <textarea value={rootInputs.q1} onChange={e => setRootInput('q1', e.target.value)}
+                          rows={2} placeholder="回答を入力してください" className={taCls} />
+                        <div className="flex justify-end">
+                          <button type="button" onClick={submitRootQ1} disabled={!rootInputs.q1.trim()}
+                            className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold disabled:opacity-40 transition-colors">
+                            入力 →
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start gap-3 bg-stone-50 rounded-xl px-4 py-2.5">
+                        <p className="text-sm text-gray-700 flex-1">👤 {rootAnswers.q1}</p>
+                        <button type="button" onClick={editRootQ1}
+                          className="shrink-0 text-xs text-gray-400 hover:text-gray-700 underline transition-colors">修正</button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Q2 */}
+                  {rootPhase !== 'q1' && rootAnswers.q1 && (
+                    <div>
+                      <p className="text-sm font-bold text-gray-800 mb-2">
+                        それはなぜ会社の仕組みとして防げなかったのでしょうか？
+                      </p>
+                      {rootPhase === 'q2' ? (
+                        <div className="space-y-2">
+                          <textarea value={rootInputs.q2} onChange={e => setRootInput('q2', e.target.value)}
+                            rows={2} placeholder="回答を入力してください" className={taCls} />
+                          <div className="flex justify-end">
+                            <button type="button" onClick={submitRootQ2} disabled={!rootInputs.q2.trim()}
+                              className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold disabled:opacity-40 transition-colors">
+                              入力 →
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start gap-3 bg-stone-50 rounded-xl px-4 py-2.5">
+                          <p className="text-sm text-gray-700 flex-1">👤 {rootAnswers.q2}</p>
+                          <button type="button" onClick={editRootQ2}
+                            className="shrink-0 text-xs text-gray-400 hover:text-gray-700 underline transition-colors">修正</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 最終確認 */}
+                  {['final_check', 'retry', 'complete'].includes(rootPhase) && rootAnswers.q2 && (
+                    <div className="space-y-3">
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                        <p className="text-sm font-bold text-amber-900">本当にそれが根本的な原因だと思いますか？</p>
+                      </div>
+
+                      {rootPhase === 'final_check' && (
+                        <div className="flex gap-3">
+                          <button type="button" onClick={() => { setRootInput('retry', ''); setRootPhase('retry') }}
+                            className="flex-1 py-2.5 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50 transition-colors">
+                            いいえ、もう少し考えます
+                          </button>
+                          <button type="button" onClick={handleRootFinalYes}
+                            className="flex-1 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold transition-colors">
+                            はい、これが真因です
+                          </button>
+                        </div>
+                      )}
+
+                      {/* 追加質問（いいえの場合） */}
+                      {(rootPhase === 'retry' || (rootPhase === 'complete' && rootAnswers.retry)) && (
+                        <div>
+                          <p className="text-sm font-semibold text-gray-700 mb-2">では何が足りないと思いますか？</p>
+                          {rootPhase === 'retry' ? (
+                            <div className="space-y-2">
+                              <textarea value={rootInputs.retry} onChange={e => setRootInput('retry', e.target.value)}
+                                rows={2} placeholder="回答を入力してください" className={taCls} />
+                              <div className="flex justify-end">
+                                <button type="button" onClick={submitRootRetry} disabled={!rootInputs.retry.trim()}
+                                  className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold disabled:opacity-40 transition-colors">
+                                  入力 →
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="bg-stone-50 rounded-xl px-4 py-2.5 text-sm text-gray-700">
+                              👤 {rootAnswers.retry}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* 完了 */}
+                      {rootPhase === 'complete' && (
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+                          <p className="text-sm font-bold text-emerald-800">✅ これが真因ですね。</p>
+                          <p className="text-sm text-emerald-700 mt-1">対話の内容を真因として自動反映しました。</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-sm mb-4 p-5 space-y-4">
+                {rootPhase === 'complete' && (
+                  <div>
+                    <label className={labelCls}>
+                      真因 <span className="text-xs text-emerald-600 font-semibold ml-1">（深掘り対話から自動入力）</span>
+                    </label>
+                    <textarea value={rootCause} onChange={e => setRootCause(e.target.value)}
+                      rows={3} className={taCls} />
+                  </div>
+                )}
+                <div>
+                  <label className={labelCls}>組織改善案 <span className="text-red-500">*</span></label>
+                  <p className={guideCls}>会社として何を変えるか？</p>
+                  <textarea value={orgImprove} onChange={e => setOrgImprove(e.target.value)}
+                    rows={3} placeholder="例：全部署共通の作業前確認を策定し、月次で見直す体制を設ける"
+                    className={taCls} />
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-sm mb-5 p-5 space-y-4">
+                <div>
+                  <label className={labelCls}>真因カテゴリー <span className="text-red-500">*</span></label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {ROOT_THEMES.map(theme => (
+                      <button key={theme} type="button" onClick={() => setRootTheme(theme)}
+                        className={cn('px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all',
+                          rootTheme === theme
+                            ? 'bg-emerald-700 text-white border-emerald-700'
+                            : 'bg-white text-gray-600 border-stone-200 hover:border-emerald-300 hover:bg-emerald-50')}>
+                        {theme}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className={labelCls}>真因詳細 <span className="text-red-500">*</span></label>
+                  <textarea value={rootDetail} onChange={e => setRootDetail(e.target.value)}
+                    rows={4} placeholder="例：キッチン引き出し清掃について、作業手順書には記載があったが現場での確認が省略されていた"
+                    className={taCls} />
+                </div>
+              </div>
+
+              {/* ■ 横展開 */}
+              <div className="bg-white rounded-2xl shadow-sm mb-5 p-5 space-y-4">
+                <p className="text-sm font-bold text-gray-800">📢 横展開</p>
+                <div>
+                  <label className={labelCls}>
+                    対象部署 <span className="text-red-500">*</span>
+                    <span className="ml-1 text-[11px] text-gray-400 font-normal">（自分の部署以外を選択）</span>
+                  </label>
+                  <div className="flex flex-wrap gap-3 mt-2">
+                    {DEPARTMENTS.map(dept => (
+                      <label key={dept} className="flex items-center gap-1.5 cursor-pointer select-none">
+                        <input type="checkbox" checked={horizDepts.includes(dept)}
+                          onChange={e => setHorizDepts(prev => e.target.checked ? [...prev, dept] : prev.filter(d => d !== dept))}
+                          className="w-4 h-4 accent-emerald-600" />
+                        <span className="text-sm text-gray-700">{dept}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className={labelCls}>周知内容 <span className="text-red-500">*</span></label>
+                  <textarea value={horizContent} onChange={e => setHorizContent(e.target.value)}
+                    rows={3} placeholder="例：今回の事象を全部署に共有し、養生作業前の確認手順を徹底するよう周知する"
+                    className={taCls} />
+                </div>
+              </div>
+
+              {/* ■ 真因対策 */}
+              <div className="bg-white rounded-2xl shadow-sm mb-5 p-5 space-y-4">
+                <p className="text-sm font-bold text-gray-800">🎯 真因対策</p>
+                <div>
+                  <label className={labelCls}>担当者 <span className="text-red-500">*</span></label>
+                  <input type="text" value={actionAssignee} onChange={e => setActionAssignee(e.target.value)}
+                    placeholder="例：山田 太郎"
+                    className="w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition" />
+                </div>
+                <div>
+                  <label className={labelCls}>期限 <span className="text-red-500">*</span></label>
+                  <input type="date" value={actionDeadline} onChange={e => setActionDeadline(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition" />
+                  {actionDeadline && (() => {
+                    const today = new Date(); today.setHours(0, 0, 0, 0)
+                    const dl = new Date(actionDeadline); dl.setHours(0, 0, 0, 0)
+                    const diff = Math.round((dl - today) / 86400000)
+                    return diff < 0
+                      ? <p className="text-xs text-red-600 font-bold mt-1.5">{Math.abs(diff)}日超過</p>
+                      : diff === 0
+                        ? <p className="text-xs text-orange-600 font-bold mt-1.5">本日期限</p>
+                        : <p className="text-xs text-emerald-700 font-semibold mt-1.5">残り {diff} 日</p>
+                  })()}
+                </div>
+                <div>
+                  <label className={labelCls}>進捗状況 <span className="text-red-500">*</span></label>
+                  <div className="flex gap-5 mt-1">
+                    {['未着手', '進行中', '完了'].map(p => (
+                      <label key={p} className="flex items-center gap-1.5 cursor-pointer select-none">
+                        <input type="radio" name="deep_action_progress" value={p} checked={actionProgress === p}
+                          onChange={() => setActionProgress(p)}
+                          className="accent-emerald-600" />
+                        <span className={cn('text-sm font-semibold',
+                          p === '完了' ? 'text-emerald-700' : p === '進行中' ? 'text-blue-700' : 'text-gray-500')}>
+                          {p}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pb-8">
+                <button type="button" onClick={() => {
+                  setRootCause(''); setOrgImprove(''); setRootTheme(''); setRootDetail('')
+                  setHorizDepts([]); setHorizContent('')
+                  setActionAssignee(''); setActionDeadline(''); setActionProgress('未着手')
+                }}
+                  className="px-5 h-12 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50">
+                  クリア
                 </button>
-              ))}
+                <button type="button" onClick={handleSubmit} disabled={submitting || !canSubmit}
+                  className="flex-1 h-12 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold disabled:opacity-40">
+                  {submitting ? '送信中...' : '深掘り分析を提出'}
+                </button>
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {/* ── 深掘り提出済み：合同改善報告書プレビュー ── */}
+      {complaint.status === '深掘り提出' && existing && (
+        <>
+          {/* プレビュー */}
+          <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-stone-100 bg-stone-50 flex items-center gap-2">
+              <span className="text-sm font-bold text-gray-700">📄 合同改善報告書プレビュー</span>
+              <span className="text-xs text-gray-400">役員に提出される内容</span>
+            </div>
+            <div className="p-5 space-y-5 text-sm">
+
+              {/* ■ クレーム概要 */}
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 border-b border-stone-100 pb-1">■ クレーム概要</p>
+                <div className="space-y-1.5 text-gray-700">
+                  <p>・発生日：{fmtDateTime(complaint.created_at)}</p>
+                  <p>・現場：{complaint.site_name || '—'}</p>
+                  <p>・クレーム内容：{complaint.content || '—'}</p>
+                  <p>・感情レベル：Lv.{complaint.emotion_level || '—'}</p>
+                </div>
+              </div>
+
+              {/* ■ 対応の顛末 */}
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 border-b border-stone-100 pb-1">■ 対応の顛末</p>
+                <div className="space-y-1.5 text-gray-700">
+                  <p>・初回連絡：{contactLogs[0]
+                    ? `${contactLogs[0].content}（${fmtDateTime(contactLogs[0].created_at)}）`
+                    : '記録なし'}</p>
+                  <p>・作業者聞き取り：{hearingText || '記録なし'}</p>
+                  <p>・是正案：{correction?.correction || '—'}</p>
+                </div>
+              </div>
+
+              {/* ■ 事業責任者確認 */}
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 border-b border-stone-100 pb-1">■ 事業責任者確認</p>
+                <div className="space-y-1.5 text-gray-700">
+                  <p>・結果：承認</p>
+                  <p>・コメント：{supervisorCommentLogs.length > 0
+                    ? supervisorCommentLogs[0].content
+                    : (complaint.supervisor_comment || '—')}</p>
+                </div>
+              </div>
+
+              {/* ■ 改善報告書（管理者） */}
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 border-b border-stone-100 pb-1">■ 改善報告書（管理者）</p>
+                <div className="space-y-1.5 text-gray-700">
+                  <p>・直接原因：{correction?.direct_cause || '—'}</p>
+                  <p>・是正処置：{correction?.correction || '—'}</p>
+                  <p>・運用改善案：{correction?.improvement || '—'}</p>
+                </div>
+              </div>
+
+              {/* ■ 深掘り分析（事業責任者） */}
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 border-b border-stone-100 pb-1">■ 深掘り分析（事業責任者）</p>
+                <div className="space-y-1.5 text-gray-700">
+                  <p>・真因：{existing.root_cause || '—'}</p>
+                  <p>・真因カテゴリー：{existing.root_theme || '—'}</p>
+                  <p>・真因詳細：{existing.root_detail || '—'}</p>
+                  <p>・組織改善案：{existing.org_improvement || '—'}</p>
+                  <p>・横展開対象部署：{Array.isArray(existing.horizontal_departments) && existing.horizontal_departments.length > 0 ? existing.horizontal_departments.join('・') : '—'}</p>
+                  <p>・周知内容：{existing.horizontal_content || '—'}</p>
+                  <p>・真因対策 担当者：{existing.action_assignee || '—'}</p>
+                  <p>・真因対策 期限：{existing.action_deadline || '—'}</p>
+                  <p>・真因対策 進捗：{existing.action_progress || '—'}</p>
+                </div>
+              </div>
+
             </div>
           </div>
 
-          <div className="flex gap-3 pb-8">
-            <button type="button" onClick={handleClear}
-              className="px-5 h-12 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50 transition-colors">
-              クリア
-            </button>
-            <button type="button" onClick={handleSubmit} disabled={submitting || !canSubmit}
-              className="flex-1 h-12 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
-              {submitting ? '送信中...' : '役員承認へ送付'}
-            </button>
+          {/* 確認アクション */}
+          <div className="bg-white rounded-2xl shadow-sm mb-8 overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-stone-100">
+              <span className="text-sm font-bold text-gray-800">役員への報告確認</span>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-gray-700 leading-relaxed">
+                この内容を合同改善報告書として役員に報告しますか？
+              </p>
+              <div className="flex gap-3">
+                <button type="button" onClick={() => navigate(`/complaints/${id}`)}
+                  className="flex-1 py-3 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50 transition-colors">
+                  いいえ・戻る
+                </button>
+                <button type="button" onClick={handleDeepApprove} disabled={deepActing}
+                  className="flex-1 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm disabled:opacity-40 transition-colors">
+                  {deepActing ? '処理中...' : 'はい・役員承認へ →'}
+                </button>
+              </div>
+            </div>
           </div>
         </>
       )}

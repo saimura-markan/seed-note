@@ -1,110 +1,38 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Lightbulb, Loader2 } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
-
-// ─── AI ヒント（4M分析） ─────────────────────────────────────────────────────
-
-function generateAIHint(directCause, correction) {
-  const c = (directCause || '').slice(0, 50)
-  const r = (correction || '').slice(0, 50)
-  return `**4M分析によるヒント 🌱**
-
-以下の4つの視点で、運用改善案をさらに深めることを検討してみてください。
-
-**👤 Man（人）** — スキル・意識・習慣
-「${c}」から、教育・訓練の見直しや、担当者間でのナレッジ共有を強化することで、同じ問題の再発を防ぎやすくなります。
-
-**📋 Method（方法）** — 手順・ルール・チェック
-是正処置「${r}」を標準手順としてドキュメント化し、チェックリストに組み込むことをお勧めします。
-
-**🔧 Machine（設備）** — ツール・機器・作業環境
-使用機材・作業環境の定期点検サイクルを見直すことで、環境起因の問題を事前に検知できます。
-
-**📦 Material（材料）** — 素材・情報・データ
-作業前の情報確認（現場状況・天候・資材状態）を事前確認リストに追加し、インプット品質を上げましょう。
-
-> 💡 これはAIによる参考ヒントです。最終的な判断は現場・組織の状況に合わせて行ってください。`
-}
-
-async function fetchAIHint(directCause, correction) {
-  try {
-    const { data, error } = await supabase.functions.invoke('ai-hint', {
-      body: { directCause, correction }
-    })
-    if (!error && data?.hint) return data.hint
-  } catch {}
-  // Edge Function が未デプロイの場合はローカル生成にフォールバック
-  return generateAIHint(directCause, correction)
-}
-
-// ─── ヘルパー ─────────────────────────────────────────────────────────────────
 
 function fmtDateTime(iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-const STEPS = ['受付済', '対応中', '是正案提出', '深掘り提出', '承認完了']
-
-function ProgressBar({ status }) {
-  const step = STEPS.indexOf(status)
-  return (
-    <div className="bg-white rounded-2xl shadow-sm px-6 py-4 mb-5">
-      <div className="flex items-center gap-0">
-        {STEPS.map((s, i) => {
-          const done = i < step; const current = i === step
-          return (
-            <div key={s} className="flex items-center flex-1 min-w-0">
-              <div className="flex flex-col items-center shrink-0">
-                <div className={cn('w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all',
-                  done ? 'bg-emerald-600 border-emerald-600 text-white' :
-                  current ? 'bg-white border-emerald-600 text-emerald-700 ring-2 ring-emerald-200' :
-                  'bg-white border-stone-200 text-stone-400')}>
-                  {done ? '✓' : i + 1}
-                </div>
-                <span className={cn('text-[10px] mt-1 text-center leading-tight whitespace-nowrap',
-                  current ? 'text-emerald-700 font-bold' : done ? 'text-emerald-500' : 'text-stone-400')}>
-                  {s}
-                </span>
-              </div>
-              {i < STEPS.length - 1 && (
-                <div className={cn('flex-1 h-0.5 mx-1 mt-[-14px]', done ? 'bg-emerald-500' : 'bg-stone-200')} />
-              )}
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// ─── メイン ──────────────────────────────────────────────────────────────────
-
 export default function CorrectionSubmit() {
   const { id } = useParams()
   const navigate = useNavigate()
 
-  const [complaint, setComplaint]       = useState(null)
-  const [contactLogs, setContactLogs]   = useState([])
+  const [complaint,      setComplaint]      = useState(null)
+  const [contactLogs,    setContactLogs]    = useState([])
   const [hearingContent, setHearingContent] = useState('')
-  const [existing, setExisting]         = useState(null)
+  const [existing,       setExisting]       = useState(null)
 
-  const [directCause, setDirectCause]   = useState('')
-  const [correction, setCorrection]     = useState('')
-  const [improvement, setImprovement]   = useState('')
-  const [aiHint, setAiHint]             = useState('')
-  const [aiLoading, setAiLoading]       = useState(false)
+  const [directCause, setDirectCause] = useState('')
+  const [correction,  setCorrection]  = useState('')
+  const [improvement, setImprovement] = useState('')
+  const [submitting,  setSubmitting]  = useState(false)
+  const [loading,     setLoading]     = useState(true)
 
-  const [submitting, setSubmitting]     = useState(false)
-  const [loading, setLoading]           = useState(true)
-  const [, setTick]                     = useState(0)
+  // ── ソクラテス対話（固定質問） ──
+  // phase: idle | q1 | q2 | final_check | retry | complete
+  const [socrPhase, setSocrPhase] = useState('idle')
+  const [answers,   setAnswers]   = useState({ q1: '', q2: '', retry: '' })
+  const [inputs,    setInputs]    = useState({ q1: '', q2: '', retry: '' })
+  // DB からの初期ロード時はソクラテス対話を自動起動しない
+  const loadingFromDb = useRef(false)
 
-  useEffect(() => {
-    const t = setInterval(() => setTick(n => n + 1), 1000)
-    return () => clearInterval(t)
-  }, [])
+  const setInput = (key, val) => setInputs(prev => ({ ...prev, [key]: val }))
 
   const fetchData = useCallback(async () => {
     const [{ data: c }, { data: logs }, { data: corr }] = await Promise.all([
@@ -119,26 +47,78 @@ export default function CorrectionSubmit() {
       if (h) setHearingContent(h.content)
     }
     if (corr && corr[0]) {
+      loadingFromDb.current = true
       setExisting(corr[0])
       setDirectCause(corr[0].direct_cause || '')
       setCorrection(corr[0].correction || '')
       setImprovement(corr[0].improvement || '')
-      setAiHint(corr[0].ai_hint || '')
+      // ソクラテス式対話の回答履歴を復元
+      const sa = corr[0].socratic_answers
+      if (sa && sa.q1) {
+        setAnswers({ q1: sa.q1 || '', q2: sa.q2 || '', retry: sa.retry || '' })
+        setInputs({ q1: sa.q1 || '', q2: sa.q2 || '', retry: sa.retry || '' })
+        setSocrPhase('complete')
+      }
     }
     setLoading(false)
   }, [id])
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  const handleGetAIHint = async () => {
-    if (!directCause.trim() || !correction.trim()) {
-      alert('「直接原因」と「是正処置」を入力してからAIヒントを取得してください')
+  // 直接原因が入力されたらQ1を自動表示、消したらリセット
+  // DB からの初期ロード時はスキップ（再提出時に既存データをそのまま表示するため）
+  useEffect(() => {
+    if (loadingFromDb.current) {
+      loadingFromDb.current = false
       return
     }
-    setAiLoading(true)
-    const hint = await fetchAIHint(directCause, correction)
-    setAiHint(hint)
-    setAiLoading(false)
+    if (directCause.trim() && socrPhase === 'idle') {
+      setSocrPhase('q1')
+    } else if (!directCause.trim()) {
+      setSocrPhase('idle')
+      setAnswers({ q1: '', q2: '', retry: '' })
+      setInputs({ q1: '', q2: '', retry: '' })
+    }
+  }, [directCause]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── 確定・修正ハンドラ ──
+  const submitQ1 = () => {
+    if (!inputs.q1.trim()) return
+    setAnswers(prev => ({ ...prev, q1: inputs.q1.trim() }))
+    setSocrPhase('q2')
+  }
+
+  const editQ1 = () => {
+    setInputs(prev => ({ ...prev, q1: answers.q1 }))
+    setAnswers({ q1: '', q2: '', retry: '' })
+    setInputs(prev => ({ ...prev, q1: answers.q1, q2: '', retry: '' }))
+    setSocrPhase('q1')
+  }
+
+  const submitQ2 = () => {
+    if (!inputs.q2.trim()) return
+    setAnswers(prev => ({ ...prev, q2: inputs.q2.trim() }))
+    setSocrPhase('final_check')
+  }
+
+  const editQ2 = () => {
+    setInputs(prev => ({ ...prev, q2: answers.q2, retry: '' }))
+    setAnswers(prev => ({ ...prev, q2: '', retry: '' }))
+    setSocrPhase('q2')
+  }
+
+  const handleFinalYes = () => {
+    const parts = []
+    if (answers.q2)    parts.push(`・${answers.q2}`)
+    if (answers.retry) parts.push(`・${answers.retry}`)
+    setImprovement(parts.join('\n'))
+    setSocrPhase('complete')
+  }
+
+  const submitRetry = () => {
+    if (!inputs.retry.trim()) return
+    setAnswers(prev => ({ ...prev, retry: inputs.retry.trim() }))
+    setSocrPhase('final_check')
   }
 
   const canSubmit = directCause.trim() && correction.trim() && improvement.trim()
@@ -146,20 +126,29 @@ export default function CorrectionSubmit() {
   const handleSubmit = async () => {
     if (!canSubmit) return
     setSubmitting(true)
-    const payload = { complaint_id: id, direct_cause: directCause, correction, improvement, ai_hint: aiHint }
+    const payload = {
+      complaint_id: id,
+      direct_cause: directCause,
+      correction,
+      improvement,
+      socratic_answers: { q1: answers.q1, q2: answers.q2, retry: answers.retry },
+    }
     if (existing) {
       await supabase.from('complaint_corrections').update(payload).eq('id', existing.id)
     } else {
       await supabase.from('complaint_corrections').insert(payload)
     }
-    const nextStatus = complaint?.status === '是正案承認' ? '改善報告書提出' : '是正案提出'
+    const nextStatus = ['是正案承認', 'correction_rejected'].includes(complaint?.status) ? '改善報告書提出' : '是正案提出'
     await supabase.from('complaints').update({ status: nextStatus }).eq('id', id)
     setSubmitting(false)
     navigate(`/complaints/${id}`)
   }
 
   const handleClear = () => {
-    setDirectCause(''); setCorrection(''); setImprovement(''); setAiHint('')
+    setDirectCause(''); setCorrection(''); setImprovement('')
+    setSocrPhase('idle')
+    setAnswers({ q1: '', q2: '', retry: '' })
+    setInputs({ q1: '', q2: '', retry: '' })
   }
 
   if (loading) return (
@@ -175,29 +164,19 @@ export default function CorrectionSubmit() {
   const labelCls = 'block text-xs font-semibold text-gray-600 mb-1.5'
   const guideCls = 'text-xs text-gray-400 mb-2 italic'
 
+  // 表示判定
+  const showQ2    = socrPhase !== 'idle' && socrPhase !== 'q1' && answers.q1
+  const showFinal = ['final_check', 'retry', 'complete'].includes(socrPhase) && answers.q2
+  const showRetry = socrPhase === 'retry' || (socrPhase === 'complete' && answers.retry)
+
   return (
-    <div className="px-6 py-6 max-w-3xl mx-auto">
+    <div className="px-6 py-6 max-w-6xl mx-auto">
       <button onClick={() => navigate(`/complaints/${id}`)}
         className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 mb-5 transition-colors">
-        <ArrowLeft size={15} /> 概要に戻る
+        <ArrowLeft size={15} /> クレーム詳細に戻る
       </button>
 
-      <ProgressBar status={complaint.status === '深掘り提出' ? '深掘り提出' : '是正案提出'} />
-
-      {/* 経過時間タイマー */}
-      {complaint.supervisor_reported_at && (() => {
-        const elapsed = Math.floor((Date.now() - new Date(complaint.supervisor_reported_at).getTime()) / 1000)
-        const pad = n => String(Math.floor(Math.abs(n))).padStart(2, '0')
-        const h = pad(elapsed / 3600)
-        const m = pad((elapsed % 3600) / 60)
-        const s = pad(elapsed % 60)
-        return (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3 mb-5 flex items-center gap-3">
-            <span className="text-xs font-semibold text-amber-700">上司報告からの経過時間</span>
-            <span className="text-lg font-black tabular-nums text-amber-800">{h}:{m}:{s}</span>
-          </div>
-        )
-      })()}
+      <h2 className="text-lg font-bold text-gray-900 mb-5">改善報告書（現象原因の特定）</h2>
 
       {/* ヘッダー */}
       <div className="bg-white rounded-2xl shadow-sm p-5 mb-5">
@@ -213,12 +192,11 @@ export default function CorrectionSubmit() {
       {/* 説明文 */}
       <div className="bg-emerald-50 rounded-2xl p-4 mb-5 border border-emerald-200">
         <p className="text-sm text-emerald-800 leading-relaxed">
-          🌱 対応が完了したら、何が起きてなぜそうなったかを整理して提出してください。<br />
-          AIがヒントをくれます。焦らず丁寧に。
+          🌱 対応が完了したら、何が起きてなぜそうなったかを整理して提出してください。
         </p>
       </div>
 
-      {/* ① 発生事実（読み取り専用） */}
+      {/* ① 発生事実 */}
       <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
         <div className="px-5 py-3.5 border-b border-stone-100 bg-stone-50">
           <span className="text-sm font-bold text-gray-700">① 発生事実（自動表示）</span>
@@ -259,6 +237,138 @@ export default function CorrectionSubmit() {
           className={taCls} />
       </div>
 
+      {/* ── ソクラテス対話 ── */}
+      {socrPhase !== 'idle' && (
+        <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden border-l-4 border-l-emerald-400">
+          <div className="px-5 py-3.5 border-b border-stone-100 bg-stone-50">
+            <span className="text-sm font-bold text-gray-700">🤖 原因の深掘り</span>
+          </div>
+          <div className="p-5 space-y-5">
+
+            {/* Q1 */}
+            <div>
+              <p className="text-sm font-bold text-gray-800 mb-2">その原因はなぜ起きたのでしょうか？</p>
+              {socrPhase === 'q1' ? (
+                <div className="space-y-2">
+                  <textarea
+                    value={inputs.q1}
+                    onChange={e => setInput('q1', e.target.value)}
+                    rows={2}
+                    placeholder="回答を入力してください"
+                    className={taCls}
+                  />
+                  <div className="flex justify-end">
+                    <button type="button" onClick={submitQ1} disabled={!inputs.q1.trim()}
+                      className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold disabled:opacity-40 transition-colors">
+                      入力 →
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-start gap-3 bg-stone-50 rounded-xl px-4 py-2.5">
+                  <p className="text-sm text-gray-700 flex-1">👤 {answers.q1}</p>
+                  <button type="button" onClick={editQ1}
+                    className="shrink-0 text-xs text-gray-400 hover:text-gray-700 underline transition-colors">
+                    修正
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Q2 */}
+            {showQ2 && (
+              <div>
+                <p className="text-sm font-bold text-gray-800 mb-2">では2度と起きないようにするには何が必要だと思いますか？</p>
+                {socrPhase === 'q2' ? (
+                  <div className="space-y-2">
+                    <textarea
+                      value={inputs.q2}
+                      onChange={e => setInput('q2', e.target.value)}
+                      rows={2}
+                      placeholder="回答を入力してください"
+                      className={taCls}
+                    />
+                    <div className="flex justify-end">
+                      <button type="button" onClick={submitQ2} disabled={!inputs.q2.trim()}
+                        className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold disabled:opacity-40 transition-colors">
+                        入力 →
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-3 bg-stone-50 rounded-xl px-4 py-2.5">
+                    <p className="text-sm text-gray-700 flex-1">👤 {answers.q2}</p>
+                    <button type="button" onClick={editQ2}
+                      className="shrink-0 text-xs text-gray-400 hover:text-gray-700 underline transition-colors">
+                      修正
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 最終確認 */}
+            {showFinal && (
+              <div className="space-y-3">
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                  <p className="text-sm font-bold text-amber-900">本当にそれで2度と起きませんか？</p>
+                </div>
+
+                {socrPhase === 'final_check' && (
+                  <div className="flex gap-3">
+                    <button type="button" onClick={() => { setInput('retry', ''); setSocrPhase('retry') }}
+                      className="flex-1 py-2.5 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50 transition-colors">
+                      いいえ、もう少し考えます
+                    </button>
+                    <button type="button" onClick={handleFinalYes}
+                      className="flex-1 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold transition-colors">
+                      はい、大丈夫です
+                    </button>
+                  </div>
+                )}
+
+                {/* 追加質問（いいえの場合） */}
+                {showRetry && (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700 mb-2">では何が足りないと思いますか？</p>
+                    {socrPhase === 'retry' ? (
+                      <div className="space-y-2">
+                        <textarea
+                          value={inputs.retry}
+                          onChange={e => setInput('retry', e.target.value)}
+                          rows={2}
+                          placeholder="回答を入力してください"
+                          className={taCls}
+                        />
+                        <div className="flex justify-end">
+                          <button type="button" onClick={submitRetry} disabled={!inputs.retry.trim()}
+                            className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold disabled:opacity-40 transition-colors">
+                            入力 →
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-stone-50 rounded-xl px-4 py-2.5 text-sm text-gray-700">
+                        👤 {answers.retry}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 完了 */}
+                {socrPhase === 'complete' && (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+                    <p className="text-sm font-bold text-emerald-800">✅ これがあなたの考える原因と対策ですね。</p>
+                    <p className="text-sm text-emerald-700 mt-1">問題なければ上司に報告を上げましょう。④ 運用改善案に自動で反映しました。</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+          </div>
+        </div>
+      )}
+
       {/* ③ 是正処置 */}
       <div className="bg-white rounded-2xl shadow-sm mb-4 p-5">
         <label className={labelCls}>③ 是正処置 <span className="text-red-500">*</span></label>
@@ -270,28 +380,16 @@ export default function CorrectionSubmit() {
 
       {/* ④ 運用改善案 */}
       <div className="bg-white rounded-2xl shadow-sm mb-5 p-5">
-        <label className={labelCls}>④ 運用改善案 <span className="text-red-500">*</span></label>
+        <label className={labelCls}>
+          ④ 運用改善案 <span className="text-red-500">*</span>
+          {socrPhase === 'complete' && (
+            <span className="ml-2 text-emerald-600 font-semibold text-[11px]">（深掘り対話から自動入力）</span>
+          )}
+        </label>
         <p className={guideCls}>今後同じことが起きないために何を変えますか？</p>
         <textarea value={improvement} onChange={e => setImprovement(e.target.value)}
-          rows={3} placeholder="例：養生確認チェックリストを刷新し、作業前の確認を管理者と2名で行う体制を整備する"
-          className={taCls + ' mb-3'} />
-
-        {/* AIヒントボタン */}
-        <button type="button" onClick={handleGetAIHint} disabled={aiLoading}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 text-sm font-semibold hover:bg-emerald-100 transition-colors disabled:opacity-50">
-          {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <Lightbulb size={14} />}
-          {aiLoading ? '分析中...' : 'AIに改善案のヒントをもらう'}
-        </button>
-
-        {/* AIヒント表示 */}
-        {aiHint && (
-          <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
-            <p className="text-xs font-bold text-amber-700 mb-2 flex items-center gap-1">
-              <Lightbulb size={12} /> AI分析ヒント
-            </p>
-            <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{aiHint}</div>
-          </div>
-        )}
+          rows={5} placeholder="例：養生確認チェックリストを刷新し、作業前の確認を管理者と2名で行う体制を整備する"
+          className={taCls} />
       </div>
 
       {/* ボタン */}

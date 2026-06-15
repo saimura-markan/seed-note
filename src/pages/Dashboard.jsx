@@ -143,7 +143,7 @@ function StepProgressBar({ status }) {
   )
 }
 
-function ComplaintCard({ c, onClick }) {
+function ComplaintCard({ c, onClick, firstContactMin }) {
   const pc = PRIORITY[c.priority] ?? PRIORITY[1]
   const timer = calcTimer(c.receivedAt, c.deadlineMinutes)
 
@@ -195,6 +195,9 @@ function ComplaintCard({ c, onClick }) {
           <span className={cn('text-xs font-semibold px-3 py-1 rounded-full', STATUS_BADGE[c.status] ?? 'bg-stone-100 text-stone-600')}>
             {c.status}
           </span>
+          {firstContactMin != null && (
+            <span className="text-xs text-gray-500">初回連絡: {firstContactMin}分</span>
+          )}
         </div>
       </div>
     </div>
@@ -247,16 +250,114 @@ function StatusComplaintCard({ c, onClick }) {
   )
 }
 
+function BulletinCard({ post }) {
+  const c = post.content || {}
+  const date = post.created_at
+    ? new Date(post.created_at).toLocaleDateString('ja-JP', { year: 'numeric', month: 'numeric', day: 'numeric' })
+    : '—'
+  const contactCount = Array.isArray(c.contact_logs) ? c.contact_logs.length : 0
+  const progressBadge =
+    c.action_progress === '完了'    ? 'bg-emerald-100 text-emerald-700' :
+    c.action_progress === '進行中'  ? 'bg-blue-100 text-blue-700'       :
+                                      'bg-stone-100 text-stone-600'
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border-l-4 border-l-emerald-400 overflow-hidden">
+      <div className="px-5 py-3 bg-emerald-50 border-b border-emerald-100 flex items-center gap-3 flex-wrap">
+        <span className="text-sm font-bold text-emerald-800">🌱 改善報告書</span>
+        <span className="text-xs text-gray-400">{date}</span>
+        {c.site_name && <span className="text-xs text-gray-600">現場：<strong>{c.site_name}</strong></span>}
+        {c.assignee  && <span className="text-xs text-gray-600">担当：<strong>{c.assignee}</strong></span>}
+      </div>
+      <div className="px-5 py-4 space-y-4">
+        {c.description && (
+          <div>
+            <p className="text-[11px] font-bold text-gray-400 mb-1">■ クレーム内容</p>
+            <p className="text-sm text-gray-700 leading-relaxed">{c.description}</p>
+          </div>
+        )}
+        <div>
+          <p className="text-[11px] font-bold text-gray-400 mb-1">■ 対応の顛末</p>
+          <p className="text-sm text-gray-700 leading-relaxed">
+            連絡{contactCount}件
+            {c.hearing          && `　聞き取り：${c.hearing}`}
+            {c.correction_action && `　現場対応：${c.correction_action}`}
+          </p>
+        </div>
+        {c.direct_cause && (
+          <div>
+            <p className="text-[11px] font-bold text-gray-400 mb-1">■ 現象原因</p>
+            <p className="text-sm text-gray-700 leading-relaxed">{c.direct_cause}</p>
+          </div>
+        )}
+        {c.improvement && (
+          <div>
+            <p className="text-[11px] font-bold text-gray-400 mb-1">■ 現象対策（現場で考えた対策案）</p>
+            <p className="text-sm text-gray-700 leading-relaxed">{c.improvement}</p>
+          </div>
+        )}
+        {(c.root_cause || c.root_theme) && (
+          <div>
+            <p className="text-[11px] font-bold text-gray-400 mb-1">■ 真因（なぜ起きたか）</p>
+            {c.root_cause && <p className="text-sm text-gray-700 leading-relaxed">{c.root_cause}</p>}
+            {c.root_theme && (
+              <span className="inline-block mt-1 text-xs font-semibold bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded-full">
+                カテゴリー：{c.root_theme}
+              </span>
+            )}
+          </div>
+        )}
+        {(c.org_improvement || c.action_assignee || c.action_deadline) && (
+          <div>
+            <p className="text-[11px] font-bold text-gray-400 mb-1">■ 組織対策（再発防止）</p>
+            {c.org_improvement && (
+              <p className="text-sm text-gray-700 leading-relaxed mb-2">{c.org_improvement}</p>
+            )}
+            <div className="flex items-center gap-3 flex-wrap text-xs">
+              {c.action_assignee && (
+                <span className="text-gray-600">担当：<strong className="text-gray-800">{c.action_assignee}</strong></span>
+              )}
+              {c.action_deadline && (
+                <span className="text-gray-600">期限：<strong className="text-gray-800">{c.action_deadline}</strong></span>
+              )}
+              {c.action_progress && (
+                <span className={cn('font-bold px-2.5 py-0.5 rounded-full', progressBadge)}>
+                  {c.action_progress}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const BULLETIN_CATEGORIES = ['標準化不足', '教育不足', 'ルール未整備', 'システム不備', '顧客確認不足', '引継ぎ不足', 'マネジメント不足', '人員配置問題']
+const BULLETIN_PERIODS = [
+  { id: 'all', label: '全て' },
+  { id: '1m',  label: '直近1ヶ月' },
+  { id: '3m',  label: '直近3ヶ月' },
+  { id: '6m',  label: '直近6ヶ月' },
+  { id: '1y',  label: '1年以内' },
+]
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const navigate = useNavigate()
   const [complaints, setComplaints] = useState([])
+  const [firstContactMap, setFirstContactMap] = useState({})
   const [loading, setLoading] = useState(true)
   const [, setTick] = useState(0)
   const [tab, setTab] = useState('all')
   const [statusFilter, setStatusFilter] = useState('未対応')
   const [viewMode, setViewMode] = useState('normal')
+  const [bulletinPosts, setBulletinPosts] = useState([])
+  const [bulletinLoading, setBulletinLoading] = useState(true)
+  const [bulletinKeyword, setBulletinKeyword] = useState('')
+  const [bulletinCategories, setBulletinCategories] = useState([])
+  const [bulletinPeriod, setBulletinPeriod] = useState('all')
 
   useEffect(() => {
     const fetch = async () => {
@@ -267,7 +368,28 @@ export default function Dashboard() {
       if (error) {
         console.error('[Dashboard] complaints fetch error:', error)
       } else {
-        setComplaints((data ?? []).map(mapRow))
+        const rows = data ?? []
+        setComplaints(rows.map(mapRow))
+        const ids = rows.map(c => c.id)
+        if (ids.length > 0) {
+          const { data: logs } = await supabase
+            .from('complaint_logs')
+            .select('complaint_id, created_at')
+            .in('complaint_id', ids)
+            .eq('type', 'contact')
+            .order('created_at', { ascending: true })
+          if (logs) {
+            const map = {}
+            logs.forEach(log => {
+              if (map[log.complaint_id] !== undefined) return
+              const complaint = rows.find(c => c.id === log.complaint_id)
+              if (complaint) {
+                map[log.complaint_id] = Math.floor((new Date(log.created_at) - new Date(complaint.received_at)) / 60000)
+              }
+            })
+            setFirstContactMap(map)
+          }
+        }
       }
       setLoading(false)
     }
@@ -277,6 +399,18 @@ export default function Dashboard() {
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 1000)
     return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    const fetchBulletin = async () => {
+      const { data } = await supabase
+        .from('bulletin_board')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (data) setBulletinPosts(data)
+      setBulletinLoading(false)
+    }
+    fetchBulletin()
   }, [])
 
   const today = new Date().toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' })
@@ -322,6 +456,22 @@ export default function Dashboard() {
 
   const displayed = viewMode === 'status' ? displayedStatus : displayedNormal
 
+  const filteredBulletinPosts = bulletinPosts.filter(post => {
+    const c = post.content || {}
+    if (bulletinPeriod !== 'all') {
+      const days = { '1m': 30, '3m': 90, '6m': 180, '1y': 365 }[bulletinPeriod]
+      if (Date.now() - new Date(post.created_at).getTime() > days * 86400000) return false
+    }
+    if (bulletinCategories.length > 0 && !bulletinCategories.includes(c.root_theme)) return false
+    if (bulletinKeyword.trim()) {
+      const kw = bulletinKeyword.trim().toLowerCase()
+      const haystack = [c.description, c.site_name, c.direct_cause, c.root_cause, c.org_improvement]
+        .filter(Boolean).join(' ').toLowerCase()
+      if (!haystack.includes(kw)) return false
+    }
+    return true
+  })
+
   const tabs = [
     { id: 'all',   label: '全件',           count: complaints.length },
     { id: 'mine',  label: '自分の担当',      count: complaints.filter(c => c.isMine).length },
@@ -338,6 +488,17 @@ export default function Dashboard() {
 
   return (
     <div className="px-6 py-6 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-base font-bold text-gray-700">クレーム管理ダッシュボード</h1>
+        <button
+          onClick={() => navigate('/complaints/new')}
+          className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold px-4 py-2 rounded-xl shadow-sm transition-colors"
+        >
+          <span className="text-base leading-none">＋</span>
+          新規依頼
+        </button>
+      </div>
+
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-7">
         {stats.map(s => <StatCard key={s.label} {...s} />)}
@@ -433,8 +594,100 @@ export default function Dashboard() {
               key={c.id}
               c={c}
               onClick={() => navigate(`/complaints/${c.id}`)}
+              firstContactMin={firstContactMap[c.id] ?? null}
             />
           ))
+        )}
+      </div>
+
+      {/* 掲示板 */}
+      <div className="mt-12 pt-8 border-t border-stone-200">
+        {/* ヘッダー */}
+        <div className="flex items-center gap-3 mb-5">
+          <h2 className="text-base font-bold text-gray-700">🌱 改善報告書掲示板</h2>
+          {!bulletinLoading && (
+            <span className="text-xs font-medium bg-stone-100 text-gray-400 px-2.5 py-0.5 rounded-full">
+              {filteredBulletinPosts.length}件
+              {filteredBulletinPosts.length !== bulletinPosts.length && (
+                <span className="text-gray-300 ml-1">/ {bulletinPosts.length}件中</span>
+              )}
+            </span>
+          )}
+        </div>
+
+        {/* 検索・フィルター */}
+        {!bulletinLoading && bulletinPosts.length > 0 && (
+          <div className="bg-emerald-50/70 rounded-2xl p-4 mb-6 space-y-3 border border-emerald-100">
+            <input
+              type="text"
+              placeholder="キーワードで検索（クレーム内容・現場名・真因など）"
+              value={bulletinKeyword}
+              onChange={e => setBulletinKeyword(e.target.value)}
+              className="w-full px-4 py-2.5 text-sm rounded-xl border border-emerald-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 placeholder-gray-400"
+            />
+            <div>
+              <p className="text-[11px] font-bold text-gray-400 mb-1.5">真因カテゴリー</p>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  onClick={() => setBulletinCategories([])}
+                  className={cn(
+                    'px-3 py-1 text-xs font-medium rounded-full border transition-colors',
+                    bulletinCategories.length === 0
+                      ? 'bg-emerald-700 text-white border-emerald-700'
+                      : 'bg-white text-gray-600 border-stone-200 hover:border-emerald-300'
+                  )}
+                >全て</button>
+                {BULLETIN_CATEGORIES.map(cat => {
+                  const active = bulletinCategories.includes(cat)
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => setBulletinCategories(prev =>
+                        active ? prev.filter(x => x !== cat) : [...prev, cat]
+                      )}
+                      className={cn(
+                        'px-3 py-1 text-xs font-medium rounded-full border transition-colors',
+                        active
+                          ? 'bg-emerald-700 text-white border-emerald-700'
+                          : 'bg-white text-gray-600 border-stone-200 hover:border-emerald-300'
+                      )}
+                    >{cat}</button>
+                  )
+                })}
+              </div>
+            </div>
+            <div>
+              <p className="text-[11px] font-bold text-gray-400 mb-1.5">期間</p>
+              <div className="flex flex-wrap gap-1.5">
+                {BULLETIN_PERIODS.map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => setBulletinPeriod(p.id)}
+                    className={cn(
+                      'px-3 py-1 text-xs font-medium rounded-full border transition-colors',
+                      bulletinPeriod === p.id
+                        ? 'bg-emerald-700 text-white border-emerald-700'
+                        : 'bg-white text-gray-600 border-stone-200 hover:border-emerald-300'
+                    )}
+                  >{p.label}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {bulletinLoading ? (
+          <p className="text-center py-8 text-gray-400 text-sm">読み込み中...</p>
+        ) : bulletinPosts.length === 0 ? (
+          <p className="text-center py-10 text-gray-400 text-sm">まだ投稿がありません。承認完了になると自動で掲載されます。</p>
+        ) : filteredBulletinPosts.length === 0 ? (
+          <p className="text-center py-10 text-gray-400 text-sm">条件に一致する投稿がありません</p>
+        ) : (
+          <div className="space-y-4">
+            {filteredBulletinPosts.map(post => (
+              <BulletinCard key={post.id} post={post} />
+            ))}
+          </div>
         )}
       </div>
     </div>

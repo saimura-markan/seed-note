@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useOutletContext } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
@@ -10,7 +10,7 @@ const CATEGORIES = ['破損', '施工不備', '遅刻', 'マナー', '近隣ト�
 
 const EMOTION_LEVELS = [
   { level: 1, label: '穏やか',       deadline: 60 },
-  { level: 2, label: 'やや気になる', deadline: 60 },
+  { level: 2, label: '気になる', deadline: 60 },
   { level: 3, label: '注意',         deadline: 60 },
   { level: 4, label: '緊張',         deadline: 30 },
   { level: 5, label: '最高緊張',     deadline: 15 },
@@ -38,7 +38,7 @@ const DEPARTMENTS = {
 const INITIAL_FORM = {
   clientName: '', clientContact: '', siteName: '',
   workerName: '', category: '', content: '',
-  emotionLevel: 3, department: '', assignee: '', receiverName: '',
+  emotionLevel: 3, department: '', assignee: '', receiverName: '', workDate: '',
 }
 
 // ─── スタイル定数 ─────────────────────────────────────────────────────────────
@@ -50,6 +50,7 @@ const labelCls = 'block text-xs font-semibold text-gray-600 mb-1.5'
 
 export default function ComplaintNew() {
   const navigate = useNavigate()
+  const { user } = useOutletContext()
   const [form, setForm]       = useState(INITIAL_FORM)
   const [submitting, setSubmitting] = useState(false)
   const [receivedAt]          = useState(() => new Date())
@@ -63,14 +64,9 @@ export default function ComplaintNew() {
 
   // ログイン中ユーザーのfull_nameを受付者名に自動入力
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
-      const userId = data.session?.user?.id
-      if (!userId) return
-      const { data: profile } = await supabase
-        .from('profiles').select('full_name').eq('id', userId).maybeSingle()
-      if (profile?.full_name) set('receiverName', profile.full_name)
-    })
-  }, [])
+    const name = user?.user_metadata?.full_name
+    if (name) set('receiverName', name)
+  }, [user])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const handleClear = () => setForm(INITIAL_FORM)
@@ -105,8 +101,8 @@ export default function ComplaintNew() {
   // ──────────────────────────────────────────────────────────────────────────
 
   // 時刻・日付フォーマット
-  const timeStr = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-  const dateStr = now.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' })
+  const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  const currentDate = now.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' })
 
   // カウントダウン計算
   const deadlineCfg   = EMOTION_LEVELS[form.emotionLevel - 1]
@@ -120,36 +116,34 @@ export default function ComplaintNew() {
 
   const lc = LEVEL_COLOR[form.emotionLevel]
 
+  const deadlineBg = {
+    1: 'bg-emerald-50 border-emerald-200',
+    2: 'bg-lime-50 border-lime-200',
+    3: 'bg-amber-50 border-amber-200',
+    4: 'bg-orange-50 border-orange-200',
+    5: 'bg-red-50 border-red-200',
+  }
+
+  const deadlineText = {
+    1: 'text-emerald-600',
+    2: 'text-lime-600',
+    3: 'text-amber-600',
+    4: 'text-orange-600',
+    5: 'text-red-600',
+  }
+
   return (
     <div className="min-h-screen pb-28" style={{ backgroundColor: '#F5F0E8' }}>
 
-      {/* ══════════ ヘッダー ══════════ */}
-      <div className="bg-white border-b border-stone-200 px-6 py-4 sticky top-0 z-20 shadow-sm">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
-
-          {/* 左：ロゴ＋コピー */}
-          <div className="flex items-center gap-3">
-            <svg width="32" height="36" viewBox="0 0 32 36" fill="none">
-              <line x1="16" y1="34" x2="16" y2="18" stroke="#16a34a" strokeWidth="2" strokeLinecap="round"/>
-              <ellipse cx="9" cy="14" rx="9" ry="5.5" transform="rotate(-15 9 14)" fill="#4ade80"/>
-              <ellipse cx="23" cy="14" rx="9" ry="5.5" transform="rotate(15 23 14)" fill="#22c55e"/>
-            </svg>
-            <div>
-              <p className="text-base font-bold leading-tight text-gray-900">Seed Note</p>
-              <p className="text-[11px] text-gray-400">クレームは、成長の種。</p>
-            </div>
-          </div>
-
-          {/* 右：リアルタイム時刻 */}
-          <div className="text-right">
-            <p className="text-xl font-mono font-bold tabular-nums text-gray-800">{timeStr}</p>
-            <p className="text-xs text-gray-400">{dateStr}</p>
-          </div>
-        </div>
-      </div>
 
       {/* ══════════ フォーム ══════════ */}
       <div className="max-w-none px-8 pt-6">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 transition-colors mb-4"
+        >
+          ← 戻る
+        </button>
         <h2 className="text-lg font-bold text-gray-900 mb-1">新規クレーム受付</h2>
         <p className="text-xs text-gray-400 mb-5">正確・迅速に記録してください。</p>
 
@@ -198,10 +192,26 @@ export default function ComplaintNew() {
                   className={inputCls} placeholder="〇〇ビル A棟" />
               </div>
             </div>
-            <div>
-              <label className={labelCls}>現場作業者名</label>
-              <input value={form.workerName} onChange={e => set('workerName', e.target.value)}
-                className={inputCls + ' max-w-xs'} placeholder="中村 太郎" />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">現場作業者名</label>
+                <input
+                  type="text"
+                  placeholder="中村 太郎"
+                  value={form.workerName}
+                  onChange={e => set('workerName', e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">作業に入った日</label>
+                <input
+                  type="date"
+                  value={form.workDate}
+                  onChange={e => set('workDate', e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-stone-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 min-w-0"
+                />
+              </div>
             </div>
           </div>
 
@@ -236,9 +246,10 @@ export default function ComplaintNew() {
           {/* 感情レベル */}
           <div className="bg-white rounded-2xl p-5 shadow-sm space-y-4">
             <p className="text-sm font-bold text-gray-800">感情レベル</p>
+            <p className="text-xs text-gray-400 mb-3">お客様の感情を数値で表現してください</p>
 
             {/* レベルカード */}
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-5 gap-2 items-stretch">
               {EMOTION_LEVELS.map(({ level, label }) => {
                 const c = LEVEL_COLOR[level]
                 const selected = form.emotionLevel === level
@@ -264,25 +275,25 @@ export default function ComplaintNew() {
                 ? 'bg-gray-100 border-gray-200'
                 : isUrgent
                   ? 'bg-red-600 border-red-600'
-                  : 'bg-red-50 border-red-200'
+                  : deadlineBg[form.emotionLevel]
             )}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className={cn('text-xs font-bold', isUrgent && !isExpired ? 'text-white' : 'text-red-600')}>
+                  <span className={cn('text-xs font-bold', isUrgent && !isExpired ? 'text-white' : deadlineText[form.emotionLevel])}>
                     ⏱ 対応期限
                   </span>
                   <span className={cn(
                     'text-[10px] font-bold px-2 py-0.5 rounded-full',
                     isUrgent && !isExpired
                       ? 'bg-white/20 text-white'
-                      : 'bg-red-100 text-red-600'
+                      : cn('bg-white/60', deadlineText[form.emotionLevel])
                   )}>
                     自動表示
                   </span>
                 </div>
                 <span className={cn(
                   'text-xs font-semibold',
-                  isUrgent && !isExpired ? 'text-white' : 'text-red-500'
+                  isUrgent && !isExpired ? 'text-white' : deadlineText[form.emotionLevel]
                 )}>
                   Lv.{form.emotionLevel}「{deadlineCfg.label}」→ {deadlineCfg.deadline}分以内
                 </span>
@@ -290,13 +301,13 @@ export default function ComplaintNew() {
               <div className="mt-2 flex items-center gap-3">
                 <span className={cn(
                   'text-3xl font-black tabular-nums font-mono',
-                  isExpired ? 'text-gray-400' : isUrgent ? 'text-white' : 'text-red-600'
+                  isExpired ? 'text-gray-400' : isUrgent ? 'text-white' : deadlineText[form.emotionLevel]
                 )}>
                   {remMM}:{remSS}
                 </span>
                 <span className={cn(
                   'text-xs',
-                  isExpired ? 'text-gray-400' : isUrgent ? 'text-red-100' : 'text-red-400'
+                  isExpired ? 'text-gray-400' : isUrgent ? 'text-red-100' : deadlineText[form.emotionLevel]
                 )}>
                   {isExpired ? '期限超過' : '残り時間'}
                 </span>

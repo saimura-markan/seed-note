@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
+import { getRole } from './lib/utils'
 import Login from './pages/Login'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
@@ -13,7 +14,7 @@ import Approval from './pages/Approval'
 import MyPage from './pages/MyPage'
 
 function RoleGuard({ user, allow, deny, children }) {
-  const role = user?.app_metadata?.role || 'user'
+  const role = getRole(user)
   const blocked = deny ? deny.includes(role) : allow ? !allow.includes(role) : false
   if (blocked) return <Navigate to="/dashboard" replace />
   return children
@@ -68,10 +69,10 @@ export default function App() {
             <RoleGuard user={user} allow={['admin', 'judgment']}><CorrectionSubmit /></RoleGuard>
           } />
           <Route path="complaints/:id/deep-analysis" element={
-            <RoleGuard user={user} deny={['admin']}><DeepAnalysisForm /></RoleGuard>
+            <RoleGuard user={user} allow={['manager', 'director']}><DeepAnalysisForm /></RoleGuard>
           } />
           <Route path="complaints/:id/approval" element={
-            <RoleGuard user={user} allow={['judgment']}><Approval /></RoleGuard>
+            <RoleGuard user={user} allow={['judgment', 'executive', 'admin']}><Approval /></RoleGuard>
           } />
           <Route path="mypage" element={<MyPage />} />
         </Route>

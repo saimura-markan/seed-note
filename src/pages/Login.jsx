@@ -34,7 +34,7 @@ export default function Login({ onLogin }) {
   const [rememberMe, setRememberMe] = useState(false)
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row">
+    <div className="h-screen flex flex-col md:flex-row overflow-hidden">
 
       {/* ══════════════════════════════════════════════════════
           左パネル 65% — 背景画像
@@ -90,13 +90,12 @@ export default function Login({ onLogin }) {
       {/* ══════════════════════════════════════════════════════
           右パネル 35% — ログインフォーム
       ══════════════════════════════════════════════════════ */}
-      <div className="w-full md:w-[35%] flex items-start justify-center bg-white px-8 pt-16 pb-12 border-l border-gray-100">
+      <div className="w-full md:w-[35%] flex items-center justify-center bg-white px-8 border-l border-gray-100 overflow-y-auto">
         <div className="w-full max-w-sm">
 
           {/* モバイル用ロゴ */}
-          <div className="md:hidden flex items-center justify-center gap-2 mb-8">
-            <img src="/seed-note-logo.png" alt="Seed Note" className="h-9 w-auto" />
-            <p className="text-base font-bold" style={{ color: '#1a4731' }}>Seed Note</p>
+          <div className="md:hidden flex justify-center mb-8 mt-12">
+            <img src="/seed-note-logo.png" alt="Seed Note" className="w-96 h-auto object-contain" />
           </div>
 
           {/* タイトル */}

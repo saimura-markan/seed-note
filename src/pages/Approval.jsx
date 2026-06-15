@@ -6,7 +6,19 @@ import { supabase } from '@/lib/supabase'
 
 // ─── 定数 ───────────────────────────────────────────────────────────────────
 
-const STEPS = ['受付済', '対応中', '是正案提出', '深掘り提出', '承認完了']
+const STEPS = ['受付', '対応中', '事業責任者確認', '改善報告書', '深掘り', '役員承認', '周知完了']
+
+function statusToStep(status) {
+  const map = {
+    '受付済': 0,
+    '対応中': 1,
+    '是正案提出': 2, '是正案差し戻し': 2, '是正案承認': 2,
+    '改善報告書提出': 3,
+    '深掘り提出': 5,
+    '承認完了': 6,
+  }
+  return map[status] ?? 0
+}
 
 const ROOT_THEME_COLORS = {
   '標準化不足': 'bg-blue-500',
@@ -36,7 +48,7 @@ function calcCountdown(submittedAt) {
 }
 
 function ProgressBar({ status }) {
-  const step = STEPS.indexOf(status)
+  const step = statusToStep(status)
   return (
     <div className="bg-white rounded-2xl shadow-sm px-6 py-4 mb-5">
       <div className="flex items-center gap-0">
@@ -90,6 +102,11 @@ export default function Approval() {
   const [themeStats, setThemeStats] = useState({})
   const [, setTick] = useState(0)
 
+  const [correction,            setCorrection]            = useState(null)
+  const [contactLogs,           setContactLogs]           = useState([])
+  const [hearingText,           setHearingText]           = useState('')
+  const [supervisorCommentLogs, setSupervisorCommentLogs] = useState([])
+
   const [comments,  setComments]  = useState({})
   const [saving,    setSaving]    = useState({})
   const [loading,   setLoading]   = useState(true)
@@ -100,11 +117,13 @@ export default function Approval() {
   }, [])
 
   const fetchData = useCallback(async () => {
-    const [{ data: c }, { data: deep }, { data: appr }, { data: stats }] = await Promise.all([
+    const [{ data: c }, { data: deep }, { data: appr }, { data: stats }, { data: logs }, { data: corr }] = await Promise.all([
       supabase.from('complaints').select('*').eq('id', id).maybeSingle(),
       supabase.from('complaint_deep_analysis').select('*').eq('complaint_id', id).order('created_at').limit(1),
       supabase.from('complaint_approvals').select('*').eq('complaint_id', id).order('sort_order'),
       supabase.from('complaint_deep_analysis').select('root_theme'),
+      supabase.from('complaint_logs').select('*').eq('complaint_id', id).order('created_at'),
+      supabase.from('complaint_corrections').select('*').eq('complaint_id', id).order('created_at').limit(1),
     ])
     if (c) setComplaint(c)
     if (deep && deep[0]) setAnalysis(deep[0])
@@ -119,6 +138,13 @@ export default function Approval() {
       stats.forEach(s => { if (s.root_theme) cnt[s.root_theme] = (cnt[s.root_theme] || 0) + 1 })
       setThemeStats(cnt)
     }
+    if (logs) {
+      setContactLogs(logs.filter(l => l.type === 'contact'))
+      const h = logs.filter(l => l.type === 'hearing').pop()
+      if (h) setHearingText(h.content)
+      setSupervisorCommentLogs(logs.filter(l => l.type === 'supervisor_comment'))
+    }
+    if (corr && corr[0]) setCorrection(corr[0])
     setLoading(false)
   }, [id])
 
@@ -143,6 +169,35 @@ export default function Approval() {
     if (updated.every(a => a.status === 'approved')) {
       await supabase.from('complaints').update({ status: '承認完了' }).eq('id', id)
       setComplaint(c => ({ ...c, status: '承認完了' }))
+
+      // 掲示板に自動投稿（重複防止）
+      const { data: existingPost } = await supabase
+        .from('bulletin_board').select('id').eq('complaint_id', id).maybeSingle()
+      if (!existingPost) {
+        await supabase.from('bulletin_board').insert({
+          complaint_id: id,
+          content: {
+            site_name:              complaint.site_name,
+            description:            complaint.content,
+            received_at:            complaint.received_at || complaint.created_at,
+            assignee:               complaint.assignee,
+            contact_logs:           contactLogs.map(l => ({ content: l.content, created_at: l.created_at })),
+            hearing:                hearingText,
+            correction_action:      correction?.correction,
+            direct_cause:           correction?.direct_cause,
+            improvement:            correction?.improvement,
+            root_cause:             analysis?.root_cause,
+            root_theme:             analysis?.root_theme,
+            root_detail:            analysis?.root_detail,
+            org_improvement:        analysis?.org_improvement,
+            action_assignee:        analysis?.action_assignee,
+            action_deadline:        analysis?.action_deadline,
+            action_progress:        analysis?.action_progress,
+            horizontal_departments: analysis?.horizontal_departments,
+            horizontal_content:     analysis?.horizontal_content,
+          },
+        })
+      }
     }
 
     setSaving(s => ({ ...s, [approvalId]: false }))
@@ -163,13 +218,11 @@ export default function Approval() {
   const totalTheme = Object.values(themeStats).reduce((s, v) => s + v, 0) || 1
 
   return (
-    <div className="px-6 py-6 max-w-3xl mx-auto">
+    <div className="px-6 py-6 max-w-6xl mx-auto">
       <button onClick={() => navigate(`/complaints/${id}`)}
         className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 mb-5 transition-colors">
-        <ArrowLeft size={15} /> 概要に戻る
+        <ArrowLeft size={15} /> クレーム詳細に戻る
       </button>
-
-      <ProgressBar status={complaint.status} />
 
       {/* ヘッダー */}
       <div className="bg-white rounded-2xl shadow-sm p-5 mb-5">
@@ -213,6 +266,68 @@ export default function Approval() {
           </div>
         </div>
       </div>
+
+      {/* 合同改善報告書プレビュー */}
+      {analysis && (
+        <div className="bg-white rounded-2xl shadow-sm mb-5 overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-stone-100 bg-stone-50 flex items-center gap-2">
+            <span className="text-sm font-bold text-gray-700">📄 合同改善報告書</span>
+            <span className="text-xs text-gray-400">役員に提出される内容</span>
+          </div>
+          <div className="p-5 space-y-5 text-sm">
+
+            <div>
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 border-b border-stone-100 pb-1">■ クレーム概要</p>
+              <div className="space-y-1.5 text-gray-700">
+                <p>・発生日：{fmtDateTime(complaint.created_at)}</p>
+                <p>・現場：{complaint.site_name || '—'}</p>
+                <p>・クレーム内容：{complaint.content || '—'}</p>
+                <p>・感情レベル：Lv.{complaint.emotion_level || '—'}</p>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 border-b border-stone-100 pb-1">■ 対応の顛末</p>
+              <div className="space-y-1.5 text-gray-700">
+                <p>・初回連絡：{contactLogs[0]
+                  ? `${contactLogs[0].content}（${fmtDateTime(contactLogs[0].created_at)}）`
+                  : '記録なし'}</p>
+                <p>・作業者聞き取り：{hearingText || '記録なし'}</p>
+                <p>・是正案：{correction?.correction || '—'}</p>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 border-b border-stone-100 pb-1">■ 事業責任者確認</p>
+              <div className="space-y-1.5 text-gray-700">
+                <p>・結果：承認</p>
+                <p>・コメント：{supervisorCommentLogs.length > 0
+                  ? supervisorCommentLogs[0].content
+                  : (complaint.supervisor_comment || '—')}</p>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 border-b border-stone-100 pb-1">■ 改善報告書（管理者）</p>
+              <div className="space-y-1.5 text-gray-700">
+                <p>・直接原因：{correction?.direct_cause || '—'}</p>
+                <p>・是正処置：{correction?.correction || '—'}</p>
+                <p>・運用改善案：{correction?.improvement || '—'}</p>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 border-b border-stone-100 pb-1">■ 深掘り分析（事業責任者）</p>
+              <div className="space-y-1.5 text-gray-700">
+                <p>・真因：{analysis.root_cause || '—'}</p>
+                <p>・組織改善案：{analysis.org_improvement || '—'}</p>
+                <p>・根源テーマ：{analysis.root_theme || '—'}</p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* ① 事業責任者の深掘り結果（読み取り専用） */}
       {analysis && (

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { ArrowLeft, LogOut } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { getRole } from '@/lib/utils'
 
 const inputCls = 'w-full h-10 px-3 rounded-xl border border-stone-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition'
 const labelCls = 'block text-xs font-semibold text-gray-600 mb-1.5'
@@ -10,7 +11,7 @@ export default function MyPage() {
   const navigate = useNavigate()
   const { user } = useOutletContext()
 
-  const role  = user?.app_metadata?.role || 'user'
+  const role  = getRole(user)
   const email = user?.email || ''
 
   const [lastNameJa,   setLastNameJa]   = useState('')
@@ -51,7 +52,7 @@ export default function MyPage() {
     const name      = [lastNameJa,   firstNameJa  ].filter(Boolean).join(' ')
     const name_kana = [lastNameKana, firstNameKana].filter(Boolean).join(' ')
     const { error } = await supabase.from('profiles').upsert({
-      id: user.id, name, name_kana, phone, updated_at: new Date().toISOString(),
+      id: user.id, name, name_kana, phone,
     })
     setSaving(false)
     if (error) setSaveErr(error.message)
@@ -91,14 +92,21 @@ export default function MyPage() {
         <p className="text-xs text-gray-400 mb-5">アカウント情報の確認・変更</p>
 
         {/* ロール */}
-        <div className="flex items-center gap-2 mb-6">
-          <span className="text-sm text-gray-600">{email}</span>
-          {role === 'admin' && (
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
-              admin
-            </span>
-          )}
-        </div>
+        {(() => {
+          const ROLE_LABELS = {
+            admin: '管理者', director: '事業責任者', executive: '役員',
+            manager: '主任', judgment: '審査担当', user: 'スタッフ',
+          }
+          const roleLabel = ROLE_LABELS[role] || role
+          return (
+            <div className="flex items-center gap-2 mb-6">
+              <span className="text-sm text-gray-600">{email}</span>
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                {roleLabel}
+              </span>
+            </div>
+          )
+        })()}
 
         {/* 個人情報 */}
         <div className="bg-white rounded-[16px] p-5 shadow-sm mb-5">

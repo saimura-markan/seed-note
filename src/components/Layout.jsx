@@ -1,14 +1,40 @@
-import { Outlet } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Outlet, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { getRole } from '../lib/utils'
 import { LogOut } from 'lucide-react'
 
+const ROLE_LABELS = {
+  admin:     '管理者',
+  director:  '事業責任者',
+  executive: '役員',
+  manager:   '主任',
+  judgment:  '審査担当',
+  user:      'スタッフ',
+}
+
 export default function Layout({ user, onLogout }) {
+  const navigate = useNavigate()
+  const [profileName, setProfileName] = useState('')
+
+  const role      = getRole(user)
+  const roleLabel = ROLE_LABELS[role] || role
+
+  useEffect(() => {
+    if (!user?.id) return
+    supabase.from('profiles').select('name').eq('id', user.id).single()
+      .then(({ data }) => { if (data?.name) setProfileName(data.name) })
+  }, [user?.id])
+
+  const displayName = profileName
+    || user?.user_metadata?.full_name
+    || user?.email?.split('@')[0]
+    || 'ユーザー'
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     onLogout()
   }
-
-  const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'ユーザー'
 
   return (
     <div className="min-h-screen bg-[#F5F0E8]">
@@ -19,12 +45,14 @@ export default function Layout({ user, onLogout }) {
           </div>
           <p className="text-sm font-bold text-gray-900">Seed Note</p>
         </div>
-
         <div className="flex items-center gap-3">
-          <div className="text-right">
+          <button
+            onClick={() => navigate('/mypage')}
+            className="text-right hover:opacity-70 transition-opacity"
+          >
             <p className="text-sm font-semibold text-gray-900 leading-none mb-0.5">{displayName}</p>
-            <p className="text-xs text-gray-400 leading-none">品質管理部</p>
-          </div>
+            <p className="text-xs text-gray-400 leading-none">{roleLabel}</p>
+          </button>
           <button
             onClick={handleLogout}
             title="ログアウト"
@@ -34,7 +62,6 @@ export default function Layout({ user, onLogout }) {
           </button>
         </div>
       </header>
-
       <main>
         <Outlet context={{ user }} />
       </main>

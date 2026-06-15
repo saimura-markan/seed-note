@@ -6,14 +6,16 @@ import { supabase } from '@/lib/supabase'
 
 // ─── 定数 ───────────────────────────────────────────────────────────────────
 
-const STEPS = ['受付済', '対応中', '是正案', '改善報告', '深掘り', '承認完了']
+const STEPS = ['受付', '対応中', '事業責任者確認', '改善報告書', '深掘り', '役員承認', '周知完了']
 
 function statusToStep(status) {
   const map = {
-    '受付済': 0, '対応中': 1,
-    '是正案提出': 2, '是正案差し戻し': 2,
-    '是正案承認': 3, '改善報告書提出': 3,
-    '深掘り提出': 4, '承認完了': 5,
+    '受付済': 0,
+    '対応中': 1,
+    '是正案提出': 2, '是正案差し戻し': 2, '是正案承認': 2,
+    '改善報告書提出': 3,
+    '深掘り提出': 5,
+    '承認完了': 6,
   }
   return map[status] ?? 0
 }
@@ -40,9 +42,15 @@ function calcTimer(receivedAt, deadlineMinutes) {
   const pad = n => String(Math.floor(Math.abs(n))).padStart(2, '0')
   if (remaining < 0) {
     const over = -remaining
-    return { overdue: true, label: `+${pad(over / 60)}:${pad(over % 60)} 超過` }
+    return { overdue: true, stopped: false, label: `+${pad(over / 60)}:${pad(over % 60)} 超過` }
   }
-  return { overdue: false, label: `${pad(remaining / 60)}:${pad(remaining % 60)}` }
+  return { overdue: false, stopped: false, label: `${pad(remaining / 60)}:${pad(remaining % 60)}` }
+}
+
+function calcElapsed(receivedAt, firstContactAt) {
+  const pad = n => String(Math.floor(Math.abs(n))).padStart(2, '0')
+  const elapsed = (new Date(firstContactAt).getTime() - new Date(receivedAt).getTime()) / 1000
+  return { overdue: false, stopped: true, label: `${pad(elapsed / 60)}:${pad(elapsed % 60)}` }
 }
 
 // ─── 進捗バー ─────────────────────────────────────────────────────────────────
@@ -107,9 +115,11 @@ function ComplaintHeader({ c, timer }) {
           </div>
         </div>
         {timer && (
-          <div className={cn('shrink-0 text-right', timer.overdue ? 'text-red-600' : 'text-gray-700')}>
+          <div className={cn('shrink-0 text-right', timer.overdue ? 'text-red-600' : timer.stopped ? 'text-emerald-700' : 'text-gray-700')}>
             <div className="text-[26px] font-black tabular-nums leading-none">{timer.label}</div>
-            <div className="text-[11px] mt-0.5">{timer.overdue ? '期限超過' : '残り対応時間'}</div>
+            <div className="text-[11px] mt-0.5">
+              {timer.stopped ? '初回連絡まで（記録済）' : timer.overdue ? '期限超過' : '残り対応時間'}
+            </div>
           </div>
         )}
       </div>
@@ -139,7 +149,7 @@ export default function ComplaintDetail() {
 
   const [complaint, setComplaint]         = useState(null)
   const [contactLogs, setContactLogs]     = useState([])
-  const [hearingLog, setHearingLog]       = useState(null)
+  const [hearingLogs, setHearingLogs]     = useState([])
   const [contactInput, setContactInput]   = useState('')
   const [hearingInput, setHearingInput]   = useState('')
   const [judgment, setJudgment]           = useState(null)
@@ -173,8 +183,7 @@ export default function ComplaintDetail() {
     if (c) { setComplaint(c); setJudgment(c.judgment || null); setImprovementReport(c.improvement_report || '') }
     if (logs) {
       setContactLogs(logs.filter(l => l.type === 'contact'))
-      const h = logs.filter(l => l.type === 'hearing').pop()
-      if (h) { setHearingLog(h); setHearingInput(h.content) }
+      setHearingLogs(logs.filter(l => l.type === 'hearing'))
       const r = logs.filter(l => l.type === 'report').pop()
       if (r) setReportLog(r)
     }
@@ -213,21 +222,15 @@ export default function ComplaintDetail() {
     setSaving(false)
   }
 
-  // 聞き取り記録（upsert）
+  // 聞き取り記録
   const handleHearingLog = async () => {
     if (!hearingInput.trim()) return
     setSaving(true)
     await ensureActive()
-    if (hearingLog) {
-      const { data } = await supabase.from('complaint_logs')
-        .update({ content: hearingInput.trim() }).eq('id', hearingLog.id).select().single()
-      if (data) setHearingLog(data)
-    } else {
-      const { data } = await supabase.from('complaint_logs').insert({
-        complaint_id: id, type: 'hearing', content: hearingInput.trim(),
-      }).select().single()
-      if (data) setHearingLog(data)
-    }
+    const { data } = await supabase.from('complaint_logs').insert({
+      complaint_id: id, type: 'hearing', content: hearingInput.trim(),
+    }).select().single()
+    if (data) { setHearingLogs(prev => [...prev, data]); setHearingInput('') }
     setSaving(false)
   }
 
@@ -296,10 +299,12 @@ export default function ComplaintDetail() {
     </div>
   )
 
-  const timer = calcTimer(complaint.received_at, complaint.deadline_minutes)
+  const timer = contactLogs.length > 0
+    ? calcElapsed(complaint.received_at, contactLogs[0].created_at)
+    : calcTimer(complaint.received_at, complaint.deadline_minutes)
 
   return (
-    <div className="px-6 py-6 max-w-3xl mx-auto">
+    <div className="px-6 py-6 max-w-6xl mx-auto">
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-emerald-600 text-white px-6 py-3 rounded-xl shadow-lg text-sm font-bold">
           {toast}
@@ -307,10 +312,11 @@ export default function ComplaintDetail() {
       )}
       <button onClick={() => navigate(`/complaints/${id}`)}
         className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 mb-5 transition-colors">
-        <ArrowLeft size={15} /> 概要に戻る
+        <ArrowLeft size={15} /> クレーム詳細に戻る
       </button>
 
-      <ProgressBar status={complaint.status} />
+      <h2 className="text-lg font-bold text-gray-900 mb-1">聞き取り及び対応詳細入力</h2>
+
       <ComplaintHeader c={complaint} timer={timer} />
 
       {/* ① お客様への連絡 */}
@@ -355,15 +361,25 @@ export default function ComplaintDetail() {
 
       {/* ② 作業者からの聞き取り */}
       <SectionCard title="② 作業者からの聞き取り" icon={ClipboardList}>
-        <textarea value={hearingInput} onChange={e => setHearingInput(e.target.value)}
-          rows={4} placeholder="作業者からの聞き取り内容を記録してください"
-          className="w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition resize-none mb-3" />
-        <div className="flex items-center justify-between">
-          {hearingLog && (
-            <span className="text-xs text-gray-400">最終更新：{fmtDateTime(hearingLog.created_at)}</span>
-          )}
+        {hearingLogs.length > 0 && (
+          <div className="mb-4 space-y-2">
+            {hearingLogs.map(log => (
+              <div key={log.id} className="flex items-start gap-3 px-4 py-2.5 rounded-xl text-sm border bg-emerald-50 border-emerald-200 text-emerald-800">
+                <span className="font-bold shrink-0">✅</span>
+                <span className="flex-1">{log.content}</span>
+                <span className="text-[11px] text-gray-400 shrink-0 mt-0.5">{fmtDateTime(log.created_at)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-2">
+          <textarea value={hearingInput} onChange={e => setHearingInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && e.shiftKey && handleHearingLog()}
+            className="flex-1 px-3 py-2 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition resize-none"
+            rows={3}
+            placeholder="作業者からの聞き取り内容を記録してください&#10;Shift+Enterで送信" />
           <button type="button" onClick={handleHearingLog} disabled={saving || !hearingInput.trim()}
-            className="ml-auto px-4 h-10 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold transition-colors disabled:opacity-40">
+            className="px-4 h-10 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold transition-colors disabled:opacity-40">
             記録する
           </button>
         </div>

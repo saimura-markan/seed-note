@@ -71,26 +71,26 @@ const MANAGER_TURN_STATUSES = new Set([
   '受付済', '対応中', '是正案提出', '是正案差し戻し', '改善報告書提出', '深掘り提出',
 ])
 
-function calcTurnColor(status, currentTurnStartedAt, deadlineMinutes) {
-  if (!currentTurnStartedAt) return null
+function calcTurnStyle(status, turnStartedAt, deadlineMinutes) {
   const isManagerTurn = MANAGER_TURN_STATUSES.has(status)
   const limitMs = (isManagerTurn ? deadlineMinutes : 1440) * 60 * 1000
-  const ratio = (Date.now() - currentTurnStartedAt) / limitMs
-  if (ratio < 0.5)  return 'border-l-green-400'
-  if (ratio < 0.83) return 'border-l-yellow-400'
-  if (ratio <= 1.0) return 'border-l-orange-400'
-  return 'border-l-red-500'
+  const ratio = (Date.now() - turnStartedAt) / limitMs
+  if (ratio < 0.5)  return { border: 'border-l-green-400',  bg: 'bg-white' }
+  if (ratio < 0.83) return { border: 'border-l-yellow-400', bg: 'bg-yellow-50' }
+  if (ratio <= 1.0) return { border: 'border-l-orange-400', bg: 'bg-orange-50' }
+  return { border: 'border-l-red-500', bg: 'bg-red-50' }
 }
 
-function calcTurnTimer(status, currentTurnStartedAt, deadlineMinutes) {
-  if (!currentTurnStartedAt) return null
+function calcTurnTimer(status, turnStartedAt, deadlineMinutes) {
   const isManagerTurn = MANAGER_TURN_STATUSES.has(status)
   const limitMs = (isManagerTurn ? deadlineMinutes : 1440) * 60 * 1000
-  const remainingMs = limitMs - (Date.now() - currentTurnStartedAt)
-  if (remainingMs <= 0) {
-    return { overdue: true, label: `+${Math.floor(-remainingMs / 60000)}分 超過` }
+  const remaining = (limitMs - (Date.now() - turnStartedAt)) / 1000
+  if (remaining < 0) {
+    const over = -remaining
+    return { overdue: true, main: '超過', sub: `+${pad(over / 60)}:${pad(over % 60)} 経過` }
   }
-  return { overdue: false, label: `残り${Math.ceil(remainingMs / 60000)}分` }
+  const color = remaining < 30 * 60 ? 'text-orange-500' : 'text-gray-700'
+  return { overdue: false, main: `${pad(remaining / 60)}:${pad(remaining % 60)}`, sub: '残り対応時間', color }
 }
 
 function mapRow(row) {
@@ -178,18 +178,19 @@ function StepProgressBar({ status }) {
   )
 }
 
-function ComplaintCard({ c, onClick, firstContactMin, mineStatuses }) {
-  const pc = PRIORITY[c.priority] ?? PRIORITY[1]
-  const isMyTurn  = mineStatuses?.includes(c.status) ?? false
-  const turnColor = calcTurnColor(c.status, c.currentTurnStartedAt, c.deadlineMinutes)
-  const turnTimer = isMyTurn ? calcTurnTimer(c.status, c.currentTurnStartedAt, c.deadlineMinutes) : null
+function ComplaintCard({ c, onClick, firstContactMin, mineStatuses, role }) {
+  const pc        = PRIORITY[c.priority] ?? PRIORITY[1]
+  const turnStart = c.currentTurnStartedAt ?? c.receivedAt
+  const isMyTurn  = role === 'admin' || (mineStatuses?.includes(c.status) ?? false)
+  const { border, bg } = calcTurnStyle(c.status, turnStart, c.deadlineMinutes)
+  const timer     = isMyTurn ? calcTurnTimer(c.status, turnStart, c.deadlineMinutes) : null
 
   return (
     <div
       onClick={onClick}
       className={cn(
-        'bg-white rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-all border-l-[5px] p-4 pl-5',
-        turnColor ?? pc.border
+        'rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-all border-l-[5px] p-4 pl-5',
+        bg, border
       )}
     >
       <div className="flex items-start gap-4">
@@ -217,16 +218,19 @@ function ComplaintCard({ c, onClick, firstContactMin, mineStatuses }) {
         </div>
 
         {/* Timer + Status */}
-        <div className="shrink-0 text-right flex flex-col items-end gap-2 min-w-[100px]">
-          {turnTimer ? (
-            <div>
-              <div className={cn('text-[20px] font-black leading-none tabular-nums', turnTimer.overdue ? 'text-red-600' : 'text-gray-700')}>
-                {turnTimer.overdue ? '超過' : turnTimer.label}
+        <div className="shrink-0 text-right flex flex-col items-end gap-2 min-w-[110px]">
+          {timer ? (
+            timer.overdue ? (
+              <div>
+                <div className="text-[22px] font-black text-red-600 leading-none">{timer.main}</div>
+                <div className="text-sm text-red-500 font-semibold mt-0.5">{timer.sub}</div>
               </div>
-              <div className={cn('text-[10px] mt-0.5', turnTimer.overdue ? 'text-red-400' : 'text-gray-400')}>
-                {turnTimer.overdue ? turnTimer.label : '残り対応時間'}
+            ) : (
+              <div>
+                <div className={cn('text-[26px] font-black tabular-nums leading-none', timer.color)}>{timer.main}</div>
+                <div className="text-[11px] text-gray-400 mt-0.5">{timer.sub}</div>
               </div>
-            </div>
+            )
           ) : (
             <div className="h-9" />
           )}
@@ -242,21 +246,21 @@ function ComplaintCard({ c, onClick, firstContactMin, mineStatuses }) {
   )
 }
 
-function StatusComplaintCard({ c, onClick, mineStatuses }) {
+function StatusComplaintCard({ c, onClick, mineStatuses, role }) {
   const stepIndex  = STATUS_TO_STEP[c.status] ?? 0
   const step       = STATUS_FLOW_STEPS[stepIndex]
   const initials   = c.assignee ? c.assignee.charAt(0) : '?'
-  const isMyTurn   = mineStatuses?.includes(c.status) ?? false
-  const turnColor  = calcTurnColor(c.status, c.currentTurnStartedAt, c.deadlineMinutes)
-  const turnTimer  = isMyTurn ? calcTurnTimer(c.status, c.currentTurnStartedAt, c.deadlineMinutes) : null
-  const borderCls  = turnColor ?? (c.status === '承認完了' ? 'border-l-emerald-500' : step?.borderColor ?? 'border-l-stone-300')
+  const turnStart  = c.currentTurnStartedAt ?? c.receivedAt
+  const isMyTurn   = role === 'admin' || (mineStatuses?.includes(c.status) ?? false)
+  const { border, bg } = calcTurnStyle(c.status, turnStart, c.deadlineMinutes)
+  const turnTimer  = isMyTurn ? calcTurnTimer(c.status, turnStart, c.deadlineMinutes) : null
 
   return (
     <div
       onClick={onClick}
       className={cn(
-        'bg-white rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-all border-l-[3px] p-4 pl-5',
-        borderCls
+        'rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-all border-l-[3px] p-4 pl-5',
+        bg, border
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -289,8 +293,8 @@ function StatusComplaintCard({ c, onClick, mineStatuses }) {
           </span>
         </div>
         {turnTimer && (
-          <span className={cn('text-xs font-bold shrink-0', turnTimer.overdue ? 'text-red-500' : 'text-gray-500')}>
-            {turnTimer.label}
+          <span className={cn('text-xs font-bold shrink-0 tabular-nums', turnTimer.overdue ? 'text-red-500' : 'text-gray-500')}>
+            {turnTimer.overdue ? turnTimer.sub : turnTimer.main}
           </span>
         )}
       </div>
@@ -726,6 +730,7 @@ export default function Dashboard() {
               c={c}
               onClick={() => navigate(`/complaints/${c.id}`)}
               mineStatuses={mineStatuses}
+              role={role}
             />
           ) : (
             <ComplaintCard
@@ -734,6 +739,7 @@ export default function Dashboard() {
               onClick={() => navigate(`/complaints/${c.id}`)}
               firstContactMin={firstContactMap[c.id] ?? null}
               mineStatuses={mineStatuses}
+              role={role}
             />
           ))
         )}

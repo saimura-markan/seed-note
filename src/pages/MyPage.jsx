@@ -4,6 +4,14 @@ import { ArrowLeft, LogOut } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { getRole } from '@/lib/utils'
 
+const DEPARTMENTS = [
+  '工事部産廃課/環境リサイクル部',
+  '工事部解体課',
+  '清掃部清掃２課',
+  '清掃部清掃１課',
+  '本部',
+]
+
 const inputCls = 'w-full h-10 px-3 rounded-xl border border-stone-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition'
 const labelCls = 'block text-xs font-semibold text-gray-600 mb-1.5'
 
@@ -19,6 +27,7 @@ export default function MyPage() {
   const [lastNameKana, setLastNameKana] = useState('')
   const [firstNameKana,setFirstNameKana]= useState('')
   const [phone,        setPhone]        = useState('')
+  const [department,   setDepartment]   = useState('')
   const [profileLoading, setProfileLoading] = useState(true)
   const [saving,  setSaving]  = useState(false)
   const [saveMsg, setSaveMsg] = useState(null)
@@ -33,7 +42,7 @@ export default function MyPage() {
 
   useEffect(() => {
     if (!user) return
-    supabase.from('profiles').select('name, name_kana, phone').eq('id', user.id).single()
+    supabase.from('profiles').select('name, name_kana, phone, department').eq('id', user.id).single()
       .then(({ data }) => {
         if (data) {
           const [ln = '', fn = ''] = (data.name      || '').split(' ')
@@ -41,6 +50,7 @@ export default function MyPage() {
           setLastNameJa(ln); setFirstNameJa(fn)
           setLastNameKana(lk); setFirstNameKana(fk)
           setPhone(data.phone || '')
+          setDepartment(data.department || '')
         }
         setProfileLoading(false)
       })
@@ -52,7 +62,7 @@ export default function MyPage() {
     const name      = [lastNameJa,   firstNameJa  ].filter(Boolean).join(' ')
     const name_kana = [lastNameKana, firstNameKana].filter(Boolean).join(' ')
     const { error } = await supabase.from('profiles').upsert({
-      id: user.id, name, name_kana, phone,
+      id: user.id, name, name_kana, phone, department,
     })
     setSaving(false)
     if (error) setSaveErr(error.message)
@@ -132,6 +142,17 @@ export default function MyPage() {
                   <input value={firstNameKana} onChange={e => setFirstNameKana(e.target.value)}
                     placeholder="めい" className={inputCls} />
                 </div>
+              </div>
+              <div>
+                <label className={labelCls}>担当部署</label>
+                <select
+                  value={department}
+                  onChange={e => setDepartment(e.target.value)}
+                  className={inputCls + ' bg-white'}
+                >
+                  <option value="">選択してください</option>
+                  {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
               </div>
               <div>
                 <label className={labelCls}>携帯電話番号</label>

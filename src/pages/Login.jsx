@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Mail, Lock, Eye, EyeOff, BookOpen, BarChart2, GraduationCap, TrendingUp } from 'lucide-react'
 
@@ -10,6 +11,8 @@ const FEATURES = [
 ]
 
 export default function Login({ onLogin }) {
+  const navigate = useNavigate()
+
   // ─── 認証ロジック（変更禁止） ────────────────────────────────────────────────
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -194,7 +197,7 @@ export default function Login({ onLogin }) {
             {/* 新規登録 */}
             <p className="text-xs text-center text-gray-400">
               アカウントをお持ちでない方は{' '}
-              <button type="button" className="font-semibold hover:underline" style={{ color: '#16a34a' }}>
+              <button type="button" onClick={() => navigate('/register')} className="font-semibold hover:underline" style={{ color: '#16a34a' }}>
                 新規登録はこちら
               </button>
             </p>

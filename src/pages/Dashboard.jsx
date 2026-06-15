@@ -57,6 +57,7 @@ const TAG_COLOR = {
 }
 
 const STATUS_FILTER_GROUPS = {
+  '全て':     null,
   '未対応':   ['受付済', '対応中'],
   '対応中':   ['是正案提出', '是正案差し戻し', '是正案承認', '改善報告書提出', '深掘り提出'],
   '承認待ち': [],
@@ -111,6 +112,7 @@ function mapRow(row) {
     deadlineMinutes:      row.deadline_minutes ?? 60,
     receivedAt:           new Date(row.received_at).getTime(),
     status:               row.status        ?? '受付済',
+    department:           row.department     ?? '',
     clientContact:        row.client_contact ?? '',
     currentTurnStartedAt: row.current_turn_started_at ? new Date(row.current_turn_started_at).getTime() : null,
     isMine:               false,
@@ -320,7 +322,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [, setTick] = useState(0)
   const [tab, setTab] = useState('all')
-  const [statusFilter, setStatusFilter] = useState('未対応')
+  const [statusFilter, setStatusFilter] = useState('全て')
+  const [userDepartment, setUserDepartment] = useState('')
 
   useEffect(() => {
     const fetch = async () => {
@@ -364,6 +367,12 @@ export default function Dashboard() {
     return () => clearInterval(id)
   }, [])
 
+  useEffect(() => {
+    if (!user?.id) return
+    supabase.from('profiles').select('department').eq('id', user.id).single()
+      .then(({ data }) => { if (data?.department) setUserDepartment(data.department) })
+  }, [user?.id])
+
   const today = new Date().toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' })
 
   const overdue = complaints.filter(c => calcTimer(c.receivedAt, c.deadlineMinutes).overdue)
@@ -389,22 +398,22 @@ export default function Dashboard() {
   ]
 
   const tabFiltered =
-    tab === 'mine' ? complaints.filter(c => mineStatuses.includes(c.status)) :
+    tab === 'dept' ? complaints.filter(c => userDepartment && c.department === userDepartment) :
     complaints
 
   const getCount = (f) => {
+    if (f === '全て') return tabFiltered.length
     const statuses = STATUS_FILTER_GROUPS[f] ?? []
     return tabFiltered.filter(c => statuses.includes(c.status)).length
   }
 
-  const displayed = tabFiltered.filter(c => {
-    const statuses = STATUS_FILTER_GROUPS[statusFilter] ?? []
-    return statuses.includes(c.status)
-  })
+  const displayed = statusFilter === '全て'
+    ? tabFiltered
+    : tabFiltered.filter(c => (STATUS_FILTER_GROUPS[statusFilter] ?? []).includes(c.status))
 
   const tabs = [
     { id: 'all',  label: '全件',      count: complaints.length },
-    { id: 'mine', label: '自分の担当', count: complaints.filter(c => mineStatuses.includes(c.status)).length },
+    { id: 'dept', label: '自分の部署', count: userDepartment ? complaints.filter(c => c.department === userDepartment).length : 0 },
   ]
 
   if (loading) {

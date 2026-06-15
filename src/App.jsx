@@ -14,6 +14,7 @@ import Approval from './pages/Approval'
 import MyPage from './pages/MyPage'
 import Analytics from './pages/Analytics'
 import BulletinBoard from './pages/BulletinBoard'
+import Register from './pages/Register'
 
 function RoleGuard({ user, allow, deny, children }) {
   const role = getRole(user)
@@ -49,6 +50,10 @@ export default function App() {
         <Route
           path="/login"
           element={user ? <Navigate to="/dashboard" replace /> : <Login onLogin={setUser} />}
+        />
+        <Route
+          path="/register"
+          element={user ? <Navigate to="/dashboard" replace /> : <Register onLogin={setUser} />}
         />
         <Route
           path="/*"

@@ -56,7 +56,13 @@ const TAG_COLOR = {
   'マナー':     'bg-violet-50 text-violet-700',
 }
 
-const STATUS_FILTERS = ['未対応', '受付済', '対応中', '是正案提出', '是正案差し戻し', '是正案承認', '改善報告書提出', '深掘り提出', '承認完了']
+const STATUS_FILTER_GROUPS = {
+  '未対応':   ['受付済', '対応中'],
+  '対応中':   ['是正案提出', '是正案差し戻し', '是正案承認', '改善報告書提出', '深掘り提出'],
+  '承認待ち': [],
+  '完了':     ['承認完了'],
+}
+const STATUS_FILTERS = Object.keys(STATUS_FILTER_GROUPS)
 
 const MINE_STATUSES = {
   manager:   ['受付済', '対応中', '是正案提出', '是正案差し戻し', '改善報告書提出', '深掘り提出'],
@@ -485,7 +491,6 @@ export default function Dashboard() {
   const [, setTick] = useState(0)
   const [tab, setTab] = useState('all')
   const [statusFilter, setStatusFilter] = useState('未対応')
-  const [viewMode, setViewMode] = useState('normal')
   const [bulletinPosts, setBulletinPosts] = useState([])
   const [bulletinLoading, setBulletinLoading] = useState(true)
   const [bulletinKeyword, setBulletinKeyword] = useState('')
@@ -579,23 +584,22 @@ export default function Dashboard() {
   ]
 
   const tabFiltered =
-    tab === 'mine'  ? complaints.filter(c => mineStatuses.includes(c.status)) :
-    tab === 'staff' ? complaints :
+    tab === 'mine' ? complaints.filter(c => mineStatuses.includes(c.status)) :
     complaints
 
-  const getCount = (f) =>
-    f === '未対応' ? tabFiltered.filter(c => c.status !== '承認完了').length
-                   : tabFiltered.filter(c => c.status === f).length
+  const getCount = (f) => {
+    const statuses = STATUS_FILTER_GROUPS[f] ?? []
+    return statuses.length === 0
+      ? tabFiltered.filter(c => statuses.includes(c.status)).length
+      : tabFiltered.filter(c => statuses.includes(c.status)).length
+  }
 
-  const displayedNormal = statusFilter === '未対応'
-    ? tabFiltered.filter(c => c.status !== '承認完了')
-    : tabFiltered.filter(c => c.status === statusFilter)
+  const displayedNormal = tabFiltered.filter(c => {
+    const statuses = STATUS_FILTER_GROUPS[statusFilter] ?? []
+    return statuses.includes(c.status)
+  })
 
-  const displayedStatus = [...tabFiltered].sort(
-    (a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status)
-  )
-
-  const displayed = viewMode === 'status' ? displayedStatus : displayedNormal
+  const displayed = displayedNormal
 
   const filteredBulletinPosts = bulletinPosts.filter(post => {
     const c = post.content || {}
@@ -614,9 +618,8 @@ export default function Dashboard() {
   })
 
   const tabs = [
-    { id: 'all',   label: '全件',           count: complaints.length },
-    { id: 'mine',  label: '自分の担当',      count: complaints.filter(c => mineStatuses.includes(c.status)).length },
-    { id: 'staff', label: '全スタッフのクレーム一覧', count: null },
+    { id: 'all',  label: '全件',      count: complaints.length },
+    { id: 'mine', label: '自分の担当', count: complaints.filter(c => mineStatuses.includes(c.status)).length },
   ]
 
   if (loading) {
@@ -671,30 +674,8 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* View mode toggle */}
-      <div className="flex items-center gap-2 mb-4">
-        <span className="text-xs text-gray-400 mr-1">表示モード：</span>
-        {[
-          { id: 'normal', label: '通常表示' },
-          { id: 'status', label: 'ステータス表示' },
-        ].map(m => (
-          <button
-            key={m.id}
-            onClick={() => setViewMode(m.id)}
-            className={cn(
-              'px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors border',
-              viewMode === m.id
-                ? 'bg-emerald-800 text-white border-emerald-800'
-                : 'bg-white text-gray-600 border-stone-200 hover:border-stone-300 hover:bg-stone-50'
-            )}
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
-
       {/* Status filter */}
-      {viewMode === 'normal' && <div className="flex items-center gap-2 mb-5 flex-wrap">
+      <div className="flex items-center gap-2 mb-5 flex-wrap">
         <span className="text-xs text-gray-400 mr-1">表示：</span>
         {STATUS_FILTERS.map(f => {
           const count = getCount(f)
@@ -717,22 +698,14 @@ export default function Dashboard() {
             </button>
           )
         })}
-      </div>}
+      </div>
 
       {/* List */}
       <div className="space-y-3">
         {displayed.length === 0 ? (
           <p className="text-center py-12 text-gray-400 text-sm">該当するクレームがありません</p>
         ) : (
-          displayed.map(c => viewMode === 'status' ? (
-            <StatusComplaintCard
-              key={c.id}
-              c={c}
-              onClick={() => navigate(`/complaints/${c.id}`)}
-              mineStatuses={mineStatuses}
-              role={role}
-            />
-          ) : (
+          displayed.map(c => (
             <ComplaintCard
               key={c.id}
               c={c}

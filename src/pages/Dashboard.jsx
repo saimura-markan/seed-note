@@ -48,12 +48,12 @@ const STATUS_BADGE = {
 }
 
 const TAG_COLOR = {
-  '遅刻':       'bg-blue-50 text-blue-700',
-  'その他':     'bg-stone-100 text-stone-600',
-  '施工不備':   'bg-red-50 text-red-700',
+  '遅刻':         'bg-blue-50 text-blue-700',
+  'その他':       'bg-stone-100 text-stone-600',
+  '施工不備':     'bg-red-50 text-red-700',
   '近隣トラブル': 'bg-amber-50 text-amber-700',
-  '破損':       'bg-red-50 text-red-700',
-  'マナー':     'bg-violet-50 text-violet-700',
+  '破損':         'bg-red-50 text-red-700',
+  'マナー':       'bg-violet-50 text-violet-700',
 }
 
 const STATUS_FILTER_GROUPS = {
@@ -101,19 +101,19 @@ function calcTurnTimer(status, turnStartedAt, deadlineMinutes) {
 
 function mapRow(row) {
   return {
-    id:              row.id,
-    priority:        row.emotion_level ?? 3,
-    company:         row.client_name   ?? '',
-    site:            row.site_name     ?? '',
-    tag:             row.category      ?? '',
-    assignee:        row.assignee      ?? '',
-    worker:          row.worker_name   ?? '',
-    deadlineMinutes: row.deadline_minutes ?? 60,
-    receivedAt:      new Date(row.received_at).getTime(),
-    status:          row.status        ?? '受付済',
-    clientContact:          row.client_contact ?? '',
-    currentTurnStartedAt:   row.current_turn_started_at ? new Date(row.current_turn_started_at).getTime() : null,
-    isMine:                 false,
+    id:                   row.id,
+    priority:             row.emotion_level ?? 3,
+    company:              row.client_name   ?? '',
+    site:                 row.site_name     ?? '',
+    tag:                  row.category      ?? '',
+    assignee:             row.assignee      ?? '',
+    worker:               row.worker_name   ?? '',
+    deadlineMinutes:      row.deadline_minutes ?? 60,
+    receivedAt:           new Date(row.received_at).getTime(),
+    status:               row.status        ?? '受付済',
+    clientContact:        row.client_contact ?? '',
+    currentTurnStartedAt: row.current_turn_started_at ? new Date(row.current_turn_started_at).getTime() : null,
+    isMine:               false,
   }
 }
 
@@ -308,176 +308,6 @@ function StatusComplaintCard({ c, onClick, mineStatuses, role }) {
   )
 }
 
-function BulletinCard({ post }) {
-  const c = post.content || {}
-  const date = post.created_at
-    ? new Date(post.created_at).toLocaleDateString('ja-JP', { year: 'numeric', month: 'numeric', day: 'numeric' })
-    : '—'
-  const contactCount = Array.isArray(c.contact_logs) ? c.contact_logs.length : 0
-  const progressBadge =
-    c.action_progress === '完了'    ? 'bg-emerald-100 text-emerald-700' :
-    c.action_progress === '進行中'  ? 'bg-blue-100 text-blue-700'       :
-                                      'bg-stone-100 text-stone-600'
-
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border-l-4 border-l-emerald-400 overflow-hidden">
-      <div className="px-5 py-3 bg-emerald-50 border-b border-emerald-100 flex items-center gap-3 flex-wrap">
-        <span className="text-sm font-bold text-emerald-800">🌱 改善報告書</span>
-        <span className="text-xs text-gray-400">{date}</span>
-        {c.site_name && <span className="text-xs text-gray-600">現場：<strong>{c.site_name}</strong></span>}
-        {c.assignee  && <span className="text-xs text-gray-600">担当：<strong>{c.assignee}</strong></span>}
-      </div>
-      <div className="px-5 py-4 space-y-4">
-        {c.description && (
-          <div>
-            <p className="text-[11px] font-bold text-gray-400 mb-1">■ クレーム内容</p>
-            <p className="text-sm text-gray-700 leading-relaxed">{c.description}</p>
-          </div>
-        )}
-        <div>
-          <p className="text-[11px] font-bold text-gray-400 mb-1">■ 対応の顛末</p>
-          <p className="text-sm text-gray-700 leading-relaxed">
-            連絡{contactCount}件
-            {c.hearing          && `　聞き取り：${c.hearing}`}
-            {c.correction_action && `　現場対応：${c.correction_action}`}
-          </p>
-        </div>
-        {c.direct_cause && (
-          <div>
-            <p className="text-[11px] font-bold text-gray-400 mb-1">■ 現象原因</p>
-            <p className="text-sm text-gray-700 leading-relaxed">{c.direct_cause}</p>
-          </div>
-        )}
-        {c.improvement && (
-          <div>
-            <p className="text-[11px] font-bold text-gray-400 mb-1">■ 現象対策（現場で考えた対策案）</p>
-            <p className="text-sm text-gray-700 leading-relaxed">{c.improvement}</p>
-          </div>
-        )}
-        {(c.root_cause || c.root_theme) && (
-          <div>
-            <p className="text-[11px] font-bold text-gray-400 mb-1">■ 真因（なぜ起きたか）</p>
-            {c.root_cause && <p className="text-sm text-gray-700 leading-relaxed">{c.root_cause}</p>}
-            {c.root_theme && (
-              <span className="inline-block mt-1 text-xs font-semibold bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded-full">
-                カテゴリー：{c.root_theme}
-              </span>
-            )}
-          </div>
-        )}
-        {(c.org_improvement || c.action_assignee || c.action_deadline) && (
-          <div>
-            <p className="text-[11px] font-bold text-gray-400 mb-1">■ 組織対策（再発防止）</p>
-            {c.org_improvement && (
-              <p className="text-sm text-gray-700 leading-relaxed mb-2">{c.org_improvement}</p>
-            )}
-            <div className="flex items-center gap-3 flex-wrap text-xs">
-              {c.action_assignee && (
-                <span className="text-gray-600">担当：<strong className="text-gray-800">{c.action_assignee}</strong></span>
-              )}
-              {c.action_deadline && (
-                <span className="text-gray-600">期限：<strong className="text-gray-800">{c.action_deadline}</strong></span>
-              )}
-              {c.action_progress && (
-                <span className={cn('font-bold px-2.5 py-0.5 rounded-full', progressBadge)}>
-                  {c.action_progress}
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ─── Analytics ────────────────────────────────────────────────────────────────
-
-function rankBy(arr, keyFn) {
-  const counts = {}
-  arr.forEach(item => {
-    const key = keyFn(item)
-    if (!key) return
-    counts[key] = (counts[key] ?? 0) + 1
-  })
-  return Object.entries(counts)
-    .sort(([, a], [, b]) => b - a)
-    .map(([name, count]) => ({ name, count }))
-}
-
-function buildMonthlyData(complaints) {
-  const now = new Date()
-  return Array.from({ length: 6 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1)
-    const count = complaints.filter(c => {
-      const cd = new Date(c.receivedAt)
-      return cd.getFullYear() === d.getFullYear() && cd.getMonth() === d.getMonth()
-    }).length
-    return { month: `${d.getMonth() + 1}月`, count }
-  })
-}
-
-function RankingList({ title, items, barClass }) {
-  const top = items.slice(0, 5)
-  const maxCount = top[0]?.count ?? 1
-  return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm">
-      <h3 className="text-sm font-bold text-gray-700 mb-4">{title}</h3>
-      {top.length === 0 ? (
-        <p className="text-xs text-gray-400 py-4 text-center">データなし</p>
-      ) : (
-        <div className="space-y-3">
-          {top.map((item, i) => (
-            <div key={item.name}>
-              <div className="flex items-center justify-between text-xs mb-1.5">
-                <span className="flex items-center gap-2 min-w-0">
-                  <span className="font-black text-gray-300 w-4 shrink-0">{i + 1}</span>
-                  <span className="text-gray-700 truncate">{item.name}</span>
-                </span>
-                <span className="font-bold text-gray-700 shrink-0 ml-2">{item.count}件</span>
-              </div>
-              <div className="h-1.5 rounded-full bg-stone-100">
-                <div
-                  className={cn('h-full rounded-full', barClass)}
-                  style={{ width: `${(item.count / maxCount) * 100}%` }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function MonthlyTrendChart({ complaints }) {
-  const data = buildMonthlyData(complaints)
-  const maxCount = Math.max(...data.map(d => d.count), 1)
-  return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm">
-      <h3 className="text-sm font-bold text-gray-700 mb-4">③ 月別発生件数推移（過去6ヶ月）</h3>
-      <div className="flex items-end gap-2 h-36">
-        {data.map(d => (
-          <div key={d.month} className="flex-1 flex flex-col items-center gap-1">
-            <span className="text-[10px] font-bold text-gray-500">{d.count > 0 ? `${d.count}件` : ''}</span>
-            <div className="w-full rounded-t-md bg-emerald-500" style={{ height: `${(d.count / maxCount) * 96}px`, minHeight: d.count > 0 ? '4px' : '0' }} />
-            <span className="text-[10px] text-gray-400">{d.month}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-const BULLETIN_CATEGORIES = ['標準化不足', '教育不足', 'ルール未整備', 'システム不備', '顧客確認不足', '引継ぎ不足', 'マネジメント不足', '人員配置問題']
-const BULLETIN_PERIODS = [
-  { id: 'all', label: '全て' },
-  { id: '1m',  label: '直近1ヶ月' },
-  { id: '3m',  label: '直近3ヶ月' },
-  { id: '6m',  label: '直近6ヶ月' },
-  { id: '1y',  label: '1年以内' },
-]
-
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
@@ -491,12 +321,6 @@ export default function Dashboard() {
   const [, setTick] = useState(0)
   const [tab, setTab] = useState('all')
   const [statusFilter, setStatusFilter] = useState('未対応')
-  const [bulletinPosts, setBulletinPosts] = useState([])
-  const [bulletinLoading, setBulletinLoading] = useState(true)
-  const [bulletinKeyword, setBulletinKeyword] = useState('')
-  const [bulletinCategories, setBulletinCategories] = useState([])
-  const [bulletinPeriod, setBulletinPeriod] = useState('all')
-  const [deepAnalyses, setDeepAnalyses] = useState([])
 
   useEffect(() => {
     const fetch = async () => {
@@ -540,47 +364,28 @@ export default function Dashboard() {
     return () => clearInterval(id)
   }, [])
 
-  useEffect(() => {
-    const fetchBulletin = async () => {
-      const { data } = await supabase
-        .from('bulletin_board')
-        .select('*')
-        .order('created_at', { ascending: false })
-      if (data) setBulletinPosts(data)
-      setBulletinLoading(false)
-    }
-    fetchBulletin()
-  }, [])
-
-  useEffect(() => {
-    supabase
-      .from('complaint_deep_analysis')
-      .select('root_theme')
-      .then(({ data }) => { if (data) setDeepAnalyses(data) })
-  }, [])
-
   const today = new Date().toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' })
 
   const overdue = complaints.filter(c => calcTimer(c.receivedAt, c.deadlineMinutes).overdue)
 
-  const todayStr   = new Date().toDateString()
-  const now        = new Date()
-  const thisMonth  = now.getMonth()
-  const thisYear   = now.getFullYear()
-  const lastMonth  = thisMonth === 0 ? 11 : thisMonth - 1
-  const lastYear   = thisMonth === 0 ? thisYear - 1 : thisYear
+  const todayStr    = new Date().toDateString()
+  const now         = new Date()
+  const thisMonth   = now.getMonth()
+  const thisYear    = now.getFullYear()
+  const lastMonth   = thisMonth === 0 ? 11 : thisMonth - 1
+  const lastYear    = thisMonth === 0 ? thisYear - 1 : thisYear
 
-  const todayCount    = complaints.filter(c => new Date(c.receivedAt).toDateString() === todayStr).length
-  const thisMonthCount= complaints.filter(c => { const d = new Date(c.receivedAt); return d.getFullYear() === thisYear  && d.getMonth() === thisMonth }).length
-  const lastMonthCount= complaints.filter(c => { const d = new Date(c.receivedAt); return d.getFullYear() === lastYear  && d.getMonth() === lastMonth }).length
-  const monthDiff     = thisMonthCount - lastMonthCount
+  const todayCount     = complaints.filter(c => new Date(c.receivedAt).toDateString() === todayStr).length
+  const thisMonthCount = complaints.filter(c => { const d = new Date(c.receivedAt); return d.getFullYear() === thisYear && d.getMonth() === thisMonth }).length
+  const lastMonthCount = complaints.filter(c => { const d = new Date(c.receivedAt); return d.getFullYear() === lastYear && d.getMonth() === lastMonth }).length
+  const monthDiff      = thisMonthCount - lastMonthCount
 
   const stats = [
-    { label: '未対応クレーム',    value: complaints.filter(c => c.status !== '承認完了').length, sub: '承認完了を除く全件',                                          icon: Sprout,      iconBg: 'bg-emerald-100', iconColor: 'text-emerald-700' },
-    { label: '本日の受付件数',    value: todayCount,                                          sub: `${today}時点`,                                           icon: CalendarDays, iconBg: 'bg-blue-100',    iconColor: 'text-blue-600' },
-    { label: '期限超過',          value: overdue.length,                                      sub: '即時フォローが必要',                                      icon: Clock,        iconBg: 'bg-red-100',     iconColor: 'text-red-600', valueColor: 'text-red-600' },
-    { label: '今月のクレーム件数', value: thisMonthCount,                                     sub: monthDiff === 0 ? '先月比 ±0件' : `先月比 ${monthDiff > 0 ? '+' : ''}${monthDiff}件`, icon: BarChart2, iconBg: 'bg-orange-100', iconColor: 'text-orange-600' },
-    { label: '先月のクレーム件数', value: lastMonthCount,                                     sub: '比較対象',                                               icon: BarChart2,    iconBg: 'bg-stone-100',   iconColor: 'text-stone-500' },
+    { label: '未対応クレーム',    value: complaints.filter(c => c.status !== '承認完了').length, sub: '承認完了を除く全件',                                                                              icon: Sprout,      iconBg: 'bg-emerald-100', iconColor: 'text-emerald-700' },
+    { label: '本日の受付件数',    value: todayCount,                                              sub: `${today}時点`,                                                                                   icon: CalendarDays, iconBg: 'bg-blue-100',    iconColor: 'text-blue-600' },
+    { label: '期限超過',          value: overdue.length,                                          sub: '即時フォローが必要',                                                                             icon: Clock,        iconBg: 'bg-red-100',     iconColor: 'text-red-600', valueColor: 'text-red-600' },
+    { label: '今月のクレーム件数', value: thisMonthCount,                                         sub: monthDiff === 0 ? '先月比 ±0件' : `先月比 ${monthDiff > 0 ? '+' : ''}${monthDiff}件`,            icon: BarChart2,    iconBg: 'bg-orange-100',  iconColor: 'text-orange-600' },
+    { label: '先月のクレーム件数', value: lastMonthCount,                                         sub: '比較対象',                                                                                       icon: BarChart2,    iconBg: 'bg-stone-100',   iconColor: 'text-stone-500' },
   ]
 
   const tabFiltered =
@@ -589,32 +394,12 @@ export default function Dashboard() {
 
   const getCount = (f) => {
     const statuses = STATUS_FILTER_GROUPS[f] ?? []
-    return statuses.length === 0
-      ? tabFiltered.filter(c => statuses.includes(c.status)).length
-      : tabFiltered.filter(c => statuses.includes(c.status)).length
+    return tabFiltered.filter(c => statuses.includes(c.status)).length
   }
 
-  const displayedNormal = tabFiltered.filter(c => {
+  const displayed = tabFiltered.filter(c => {
     const statuses = STATUS_FILTER_GROUPS[statusFilter] ?? []
     return statuses.includes(c.status)
-  })
-
-  const displayed = displayedNormal
-
-  const filteredBulletinPosts = bulletinPosts.filter(post => {
-    const c = post.content || {}
-    if (bulletinPeriod !== 'all') {
-      const days = { '1m': 30, '3m': 90, '6m': 180, '1y': 365 }[bulletinPeriod]
-      if (Date.now() - new Date(post.created_at).getTime() > days * 86400000) return false
-    }
-    if (bulletinCategories.length > 0 && !bulletinCategories.includes(c.root_theme)) return false
-    if (bulletinKeyword.trim()) {
-      const kw = bulletinKeyword.trim().toLowerCase()
-      const haystack = [c.description, c.site_name, c.direct_cause, c.root_cause, c.org_improvement]
-        .filter(Boolean).join(' ').toLowerCase()
-      if (!haystack.includes(kw)) return false
-    }
-    return true
   })
 
   const tabs = [
@@ -644,8 +429,24 @@ export default function Dashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-7">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
         {stats.map(s => <StatCard key={s.label} {...s} />)}
+      </div>
+
+      {/* Nav buttons */}
+      <div className="grid grid-cols-2 gap-3 mb-7">
+        <button
+          onClick={() => navigate('/analytics')}
+          className="flex items-center justify-center gap-2 bg-white border border-emerald-200 hover:bg-emerald-50 text-emerald-800 font-semibold text-sm px-4 py-3 rounded-xl shadow-sm transition-colors"
+        >
+          📊 分析・ランキング
+        </button>
+        <button
+          onClick={() => navigate('/bulletin-board')}
+          className="flex items-center justify-center gap-2 bg-white border border-emerald-200 hover:bg-emerald-50 text-emerald-800 font-semibold text-sm px-4 py-3 rounded-xl shadow-sm transition-colors"
+        >
+          🌱 改善報告書掲示板
+        </button>
       </div>
 
       {/* Tabs */}
@@ -715,131 +516,6 @@ export default function Dashboard() {
               role={role}
             />
           ))
-        )}
-      </div>
-
-      {/* 分析・ランキング */}
-      <div className="mt-12 pt-8 border-t border-stone-200">
-        <div className="flex items-center gap-3 mb-6">
-          <h2 className="text-base font-bold text-gray-700">📊 分析・ランキング</h2>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-          <RankingList
-            title="① 真因カテゴリーランキング"
-            items={rankBy(deepAnalyses, d => d.root_theme)}
-            barClass="bg-emerald-500"
-          />
-          <RankingList
-            title="② 担当者別クレーム件数ランキング"
-            items={rankBy(complaints, c => c.assignee)}
-            barClass="bg-blue-400"
-          />
-        </div>
-        <div className="mb-4">
-          <MonthlyTrendChart complaints={complaints} />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <RankingList
-            title="④ 元請様別ランキング"
-            items={rankBy(complaints, c => c.company)}
-            barClass="bg-orange-400"
-          />
-          <RankingList
-            title="⑤ 元請担当者ランキング"
-            items={rankBy(complaints, c => c.clientContact)}
-            barClass="bg-violet-400"
-          />
-        </div>
-      </div>
-
-      {/* 掲示板 */}
-      <div className="mt-12 pt-8 border-t border-stone-200">
-        {/* ヘッダー */}
-        <div className="flex items-center gap-3 mb-5">
-          <h2 className="text-base font-bold text-gray-700">🌱 改善報告書掲示板</h2>
-          {!bulletinLoading && (
-            <span className="text-xs font-medium bg-stone-100 text-gray-400 px-2.5 py-0.5 rounded-full">
-              {filteredBulletinPosts.length}件
-              {filteredBulletinPosts.length !== bulletinPosts.length && (
-                <span className="text-gray-300 ml-1">/ {bulletinPosts.length}件中</span>
-              )}
-            </span>
-          )}
-        </div>
-
-        {/* 検索・フィルター */}
-        {!bulletinLoading && bulletinPosts.length > 0 && (
-          <div className="bg-emerald-50/70 rounded-2xl p-4 mb-6 space-y-3 border border-emerald-100">
-            <input
-              type="text"
-              placeholder="キーワードで検索（クレーム内容・現場名・真因など）"
-              value={bulletinKeyword}
-              onChange={e => setBulletinKeyword(e.target.value)}
-              className="w-full px-4 py-2.5 text-sm rounded-xl border border-emerald-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 placeholder-gray-400"
-            />
-            <div>
-              <p className="text-[11px] font-bold text-gray-400 mb-1.5">真因カテゴリー</p>
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  onClick={() => setBulletinCategories([])}
-                  className={cn(
-                    'px-3 py-1 text-xs font-medium rounded-full border transition-colors',
-                    bulletinCategories.length === 0
-                      ? 'bg-emerald-700 text-white border-emerald-700'
-                      : 'bg-white text-gray-600 border-stone-200 hover:border-emerald-300'
-                  )}
-                >全て</button>
-                {BULLETIN_CATEGORIES.map(cat => {
-                  const active = bulletinCategories.includes(cat)
-                  return (
-                    <button
-                      key={cat}
-                      onClick={() => setBulletinCategories(prev =>
-                        active ? prev.filter(x => x !== cat) : [...prev, cat]
-                      )}
-                      className={cn(
-                        'px-3 py-1 text-xs font-medium rounded-full border transition-colors',
-                        active
-                          ? 'bg-emerald-700 text-white border-emerald-700'
-                          : 'bg-white text-gray-600 border-stone-200 hover:border-emerald-300'
-                      )}
-                    >{cat}</button>
-                  )
-                })}
-              </div>
-            </div>
-            <div>
-              <p className="text-[11px] font-bold text-gray-400 mb-1.5">期間</p>
-              <div className="flex flex-wrap gap-1.5">
-                {BULLETIN_PERIODS.map(p => (
-                  <button
-                    key={p.id}
-                    onClick={() => setBulletinPeriod(p.id)}
-                    className={cn(
-                      'px-3 py-1 text-xs font-medium rounded-full border transition-colors',
-                      bulletinPeriod === p.id
-                        ? 'bg-emerald-700 text-white border-emerald-700'
-                        : 'bg-white text-gray-600 border-stone-200 hover:border-emerald-300'
-                    )}
-                  >{p.label}</button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {bulletinLoading ? (
-          <p className="text-center py-8 text-gray-400 text-sm">読み込み中...</p>
-        ) : bulletinPosts.length === 0 ? (
-          <p className="text-center py-10 text-gray-400 text-sm">まだ投稿がありません。承認完了になると自動で掲載されます。</p>
-        ) : filteredBulletinPosts.length === 0 ? (
-          <p className="text-center py-10 text-gray-400 text-sm">条件に一致する投稿がありません</p>
-        ) : (
-          <div className="space-y-4">
-            {filteredBulletinPosts.map(post => (
-              <BulletinCard key={post.id} post={post} />
-            ))}
-          </div>
         )}
       </div>
     </div>

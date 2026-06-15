@@ -12,6 +12,8 @@ import CorrectionSubmit from './pages/CorrectionSubmit'
 import DeepAnalysisForm from './pages/DeepAnalysisForm'
 import Approval from './pages/Approval'
 import MyPage from './pages/MyPage'
+import Analytics from './pages/Analytics'
+import BulletinBoard from './pages/BulletinBoard'
 
 function RoleGuard({ user, allow, deny, children }) {
   const role = getRole(user)
@@ -75,6 +77,8 @@ export default function App() {
             <RoleGuard user={user} allow={['judgment', 'executive', 'admin']}><Approval /></RoleGuard>
           } />
           <Route path="mypage" element={<MyPage />} />
+          <Route path="analytics" element={<Analytics />} />
+          <Route path="bulletin-board" element={<BulletinBoard />} />
         </Route>
       </Routes>
     </BrowserRouter>

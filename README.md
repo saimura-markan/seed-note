@@ -333,6 +333,7 @@ SERVICE_KEY="eyJ..." node scripts/seed-bulletin.mjs
 | `docs/screens.md` | 全9画面の詳細（入力項目・ロール別ボタン・ナビゲーション構造） |
 | `docs/database-design.md` | 全テーブルの推定スキーマ・bulletin_board jsonb 構造・RLS 確認事項・ALTER TABLE 履歴 |
 | `docs/permissions.md` | 6ロールの定義・ルートガード設定・権限マトリクス・現状の課題 |
+| `docs/disaster-recovery.md` | 障害復旧手順・環境変数一覧・GitHub PAT漏洩対応・月次バックアップ運用ルール |
 
 > **注意：** `database-design.md` のスキーマはコードから逆算した推定値。Supabase Dashboard の実スキーマと照合して差異があれば更新すること。
 

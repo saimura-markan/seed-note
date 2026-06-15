@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useOutletContext } from 'react-router-dom'
 import { Sprout, CalendarDays, Clock, BarChart2 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, getRole } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -58,6 +58,13 @@ const TAG_COLOR = {
 
 const STATUS_FILTERS = ['未対応', '受付済', '対応中', '是正案提出', '是正案差し戻し', '是正案承認', '改善報告書提出', '深掘り提出', '承認完了']
 
+const MINE_STATUSES = {
+  manager:   ['受付済', '対応中', '是正案提出', '是正案差し戻し', '改善報告書提出', '深掘り提出'],
+  director:  ['是正案承認'],
+  executive: ['承認完了'],
+  admin:     ['承認完了'],
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function mapRow(row) {
@@ -72,6 +79,7 @@ function mapRow(row) {
     deadlineMinutes: row.deadline_minutes ?? 60,
     receivedAt:      new Date(row.received_at).getTime(),
     status:          row.status        ?? '受付済',
+    clientContact:   row.client_contact ?? '',
     isMine:          false,
   }
 }
@@ -333,6 +341,84 @@ function BulletinCard({ post }) {
   )
 }
 
+// ─── Analytics ────────────────────────────────────────────────────────────────
+
+function rankBy(arr, keyFn) {
+  const counts = {}
+  arr.forEach(item => {
+    const key = keyFn(item)
+    if (!key) return
+    counts[key] = (counts[key] ?? 0) + 1
+  })
+  return Object.entries(counts)
+    .sort(([, a], [, b]) => b - a)
+    .map(([name, count]) => ({ name, count }))
+}
+
+function buildMonthlyData(complaints) {
+  const now = new Date()
+  return Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1)
+    const count = complaints.filter(c => {
+      const cd = new Date(c.receivedAt)
+      return cd.getFullYear() === d.getFullYear() && cd.getMonth() === d.getMonth()
+    }).length
+    return { month: `${d.getMonth() + 1}月`, count }
+  })
+}
+
+function RankingList({ title, items, barClass }) {
+  const top = items.slice(0, 5)
+  const maxCount = top[0]?.count ?? 1
+  return (
+    <div className="bg-white rounded-2xl p-5 shadow-sm">
+      <h3 className="text-sm font-bold text-gray-700 mb-4">{title}</h3>
+      {top.length === 0 ? (
+        <p className="text-xs text-gray-400 py-4 text-center">データなし</p>
+      ) : (
+        <div className="space-y-3">
+          {top.map((item, i) => (
+            <div key={item.name}>
+              <div className="flex items-center justify-between text-xs mb-1.5">
+                <span className="flex items-center gap-2 min-w-0">
+                  <span className="font-black text-gray-300 w-4 shrink-0">{i + 1}</span>
+                  <span className="text-gray-700 truncate">{item.name}</span>
+                </span>
+                <span className="font-bold text-gray-700 shrink-0 ml-2">{item.count}件</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-stone-100">
+                <div
+                  className={cn('h-full rounded-full', barClass)}
+                  style={{ width: `${(item.count / maxCount) * 100}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MonthlyTrendChart({ complaints }) {
+  const data = buildMonthlyData(complaints)
+  const maxCount = Math.max(...data.map(d => d.count), 1)
+  return (
+    <div className="bg-white rounded-2xl p-5 shadow-sm">
+      <h3 className="text-sm font-bold text-gray-700 mb-4">③ 月別発生件数推移（過去6ヶ月）</h3>
+      <div className="flex items-end gap-2 h-36">
+        {data.map(d => (
+          <div key={d.month} className="flex-1 flex flex-col items-center gap-1">
+            <span className="text-[10px] font-bold text-gray-500">{d.count > 0 ? `${d.count}件` : ''}</span>
+            <div className="w-full rounded-t-md bg-emerald-500" style={{ height: `${(d.count / maxCount) * 96}px`, minHeight: d.count > 0 ? '4px' : '0' }} />
+            <span className="text-[10px] text-gray-400">{d.month}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 const BULLETIN_CATEGORIES = ['標準化不足', '教育不足', 'ルール未整備', 'システム不備', '顧客確認不足', '引継ぎ不足', 'マネジメント不足', '人員配置問題']
 const BULLETIN_PERIODS = [
   { id: 'all', label: '全て' },
@@ -346,6 +432,9 @@ const BULLETIN_PERIODS = [
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { user } = useOutletContext()
+  const role = getRole(user)
+  const mineStatuses = MINE_STATUSES[role] ?? []
   const [complaints, setComplaints] = useState([])
   const [firstContactMap, setFirstContactMap] = useState({})
   const [loading, setLoading] = useState(true)
@@ -358,6 +447,7 @@ export default function Dashboard() {
   const [bulletinKeyword, setBulletinKeyword] = useState('')
   const [bulletinCategories, setBulletinCategories] = useState([])
   const [bulletinPeriod, setBulletinPeriod] = useState('all')
+  const [deepAnalyses, setDeepAnalyses] = useState([])
 
   useEffect(() => {
     const fetch = async () => {
@@ -413,6 +503,13 @@ export default function Dashboard() {
     fetchBulletin()
   }, [])
 
+  useEffect(() => {
+    supabase
+      .from('complaint_deep_analysis')
+      .select('root_theme')
+      .then(({ data }) => { if (data) setDeepAnalyses(data) })
+  }, [])
+
   const today = new Date().toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' })
 
   const overdue = complaints.filter(c => calcTimer(c.receivedAt, c.deadlineMinutes).overdue)
@@ -438,7 +535,7 @@ export default function Dashboard() {
   ]
 
   const tabFiltered =
-    tab === 'mine'  ? complaints.filter(c => c.isMine) :
+    tab === 'mine'  ? complaints.filter(c => mineStatuses.includes(c.status)) :
     tab === 'staff' ? complaints :
     complaints
 
@@ -474,7 +571,7 @@ export default function Dashboard() {
 
   const tabs = [
     { id: 'all',   label: '全件',           count: complaints.length },
-    { id: 'mine',  label: '自分の担当',      count: complaints.filter(c => c.isMine).length },
+    { id: 'mine',  label: '自分の担当',      count: complaints.filter(c => mineStatuses.includes(c.status)).length },
     { id: 'staff', label: '全スタッフのクレーム一覧', count: null },
   ]
 
@@ -598,6 +695,40 @@ export default function Dashboard() {
             />
           ))
         )}
+      </div>
+
+      {/* 分析・ランキング */}
+      <div className="mt-12 pt-8 border-t border-stone-200">
+        <div className="flex items-center gap-3 mb-6">
+          <h2 className="text-base font-bold text-gray-700">📊 分析・ランキング</h2>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <RankingList
+            title="① 真因カテゴリーランキング"
+            items={rankBy(deepAnalyses, d => d.root_theme)}
+            barClass="bg-emerald-500"
+          />
+          <RankingList
+            title="② 担当者別クレーム件数ランキング"
+            items={rankBy(complaints, c => c.assignee)}
+            barClass="bg-blue-400"
+          />
+        </div>
+        <div className="mb-4">
+          <MonthlyTrendChart complaints={complaints} />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <RankingList
+            title="④ 元請様別ランキング"
+            items={rankBy(complaints, c => c.company)}
+            barClass="bg-orange-400"
+          />
+          <RankingList
+            title="⑤ 元請担当者ランキング"
+            items={rankBy(complaints, c => c.clientContact)}
+            barClass="bg-violet-400"
+          />
+        </div>
       </div>
 
       {/* 掲示板 */}

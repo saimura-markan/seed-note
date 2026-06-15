@@ -167,7 +167,7 @@ export default function Approval() {
       a.id === approvalId ? { ...a, status } : a
     )
     if (updated.every(a => a.status === 'approved')) {
-      await supabase.from('complaints').update({ status: '承認完了' }).eq('id', id)
+      await supabase.from('complaints').update({ status: '承認完了', current_turn_started_at: new Date().toISOString() }).eq('id', id)
       setComplaint(c => ({ ...c, status: '承認完了' }))
 
       // 掲示板に自動投稿（重複防止）

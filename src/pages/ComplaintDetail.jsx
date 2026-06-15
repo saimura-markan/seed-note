@@ -195,7 +195,7 @@ export default function ComplaintDetail() {
   // ステータスを '対応中' に更新（最初のログ記録時）
   const ensureActive = async () => {
     if (!complaint || complaint.status !== '受付済') return
-    await supabase.from('complaints').update({ status: '対応中' }).eq('id', id)
+    await supabase.from('complaints').update({ status: '対応中', current_turn_started_at: new Date().toISOString() }).eq('id', id)
     setComplaint(c => ({ ...c, status: '対応中' }))
   }
 
@@ -242,6 +242,7 @@ export default function ComplaintDetail() {
     await supabase.from('complaints').update({
       judgment: j,
       status: '是正案提出',
+      current_turn_started_at: new Date().toISOString(),
     }).eq('id', id)
     setComplaint(c => ({ ...c, judgment: j, status: '是正案提出' }))
   }
@@ -262,7 +263,7 @@ export default function ComplaintDetail() {
       return
     }
     const reportedAt = new Date().toISOString()
-    await supabase.from('complaints').update({ status: '是正案提出', supervisor_reported_at: reportedAt }).eq('id', id)
+    await supabase.from('complaints').update({ status: '是正案提出', supervisor_reported_at: reportedAt, current_turn_started_at: new Date().toISOString() }).eq('id', id)
     setComplaint(c => ({ ...c, status: '是正案提出', supervisor_reported_at: reportedAt }))
     setSaving(false)
     setToast('上司に報告しました ✅')
@@ -280,6 +281,7 @@ export default function ComplaintDetail() {
       improvement_report: improvementReport,
       improvement_reported_at: new Date().toISOString(),
       status: '改善報告書提出',
+      current_turn_started_at: new Date().toISOString(),
     }).eq('id', id)
     setComplaint(c => ({ ...c, improvement_report: improvementReport, status: '改善報告書提出' }))
     setSaving(false)

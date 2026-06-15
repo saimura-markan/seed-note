@@ -155,7 +155,7 @@ export default function DeepAnalysisForm() {
 
     if (complaint.judgment === '手直し') {
       const { error } = await supabase.from('complaints').update({
-        status: '改善報告書提出', supervisor_approved_at: now, supervisor_comment: supervisorComment,
+        status: '改善報告書提出', supervisor_approved_at: now, supervisor_comment: supervisorComment, current_turn_started_at: now,
       }).eq('id', id)
       if (error) { setApproving(false); alert(`承認に失敗しました: ${error.message}`); return }
       const { error: e } = await supabase.from('complaint_logs').insert({ complaint_id: id, type: 'supervisor_comment', content: commentContent })
@@ -166,7 +166,7 @@ export default function DeepAnalysisForm() {
     }
 
     const { error } = await supabase.from('complaints').update({
-      status: '是正案承認', supervisor_approved_at: now, supervisor_comment: supervisorComment,
+      status: '是正案承認', supervisor_approved_at: now, supervisor_comment: supervisorComment, current_turn_started_at: now,
     }).eq('id', id)
     if (error) { alert(`承認に失敗しました: ${error.message}`); setApproving(false); return }
     const { error: e } = await supabase.from('complaint_logs').insert({ complaint_id: id, type: 'supervisor_comment', content: commentContent })
@@ -179,7 +179,7 @@ export default function DeepAnalysisForm() {
   const handleReject = async () => {
     if (!supervisorComment.trim()) { alert('差し戻しコメントを入力してください'); return }
     setApproving(true)
-    const { error } = await supabase.from('complaints').update({ status: '是正案差し戻し', supervisor_comment: supervisorComment }).eq('id', id)
+    const { error } = await supabase.from('complaints').update({ status: '是正案差し戻し', supervisor_comment: supervisorComment, current_turn_started_at: new Date().toISOString() }).eq('id', id)
     if (error) { alert(`差し戻しに失敗しました: ${error.message}`); setApproving(false); return }
     const { error: e } = await supabase.from('complaint_logs').insert({ complaint_id: id, type: 'supervisor_comment', content: `差し戻し: ${supervisorComment.trim()}` })
     if (e) console.error('[handleReject]', e.message)
@@ -192,7 +192,7 @@ export default function DeepAnalysisForm() {
     if (!corrRejectReason.trim()) return
     setCorrRejecting(true)
     await supabase.from('complaint_logs').insert({ complaint_id: id, type: 'correction_rejected', content: corrRejectReason.trim() })
-    await supabase.from('complaints').update({ status: 'correction_rejected' }).eq('id', id)
+    await supabase.from('complaints').update({ status: 'correction_rejected', current_turn_started_at: new Date().toISOString() }).eq('id', id)
     setCorrRejecting(false)
     navigate(`/complaints/${id}`)
   }
@@ -225,7 +225,7 @@ export default function DeepAnalysisForm() {
     if (!existingApprovals || existingApprovals.length === 0) {
       await supabase.from('complaint_approvals').insert(APPROVERS.map(a => ({ complaint_id: id, ...a, status: 'pending' })))
     }
-    await supabase.from('complaints').update({ status: '深掘り提出' }).eq('id', id)
+    await supabase.from('complaints').update({ status: '深掘り提出', current_turn_started_at: new Date().toISOString() }).eq('id', id)
     setSubmitting(false)
     await fetchData()
   }

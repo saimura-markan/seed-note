@@ -67,6 +67,32 @@ const MINE_STATUSES = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const MANAGER_TURN_STATUSES = new Set([
+  '受付済', '対応中', '是正案提出', '是正案差し戻し', '改善報告書提出', '深掘り提出',
+])
+
+function calcTurnColor(status, currentTurnStartedAt, deadlineMinutes) {
+  if (!currentTurnStartedAt) return null
+  const isManagerTurn = MANAGER_TURN_STATUSES.has(status)
+  const limitMs = (isManagerTurn ? deadlineMinutes : 1440) * 60 * 1000
+  const ratio = (Date.now() - currentTurnStartedAt) / limitMs
+  if (ratio < 0.5)  return 'border-l-green-400'
+  if (ratio < 0.83) return 'border-l-yellow-400'
+  if (ratio <= 1.0) return 'border-l-orange-400'
+  return 'border-l-red-500'
+}
+
+function calcTurnTimer(status, currentTurnStartedAt, deadlineMinutes) {
+  if (!currentTurnStartedAt) return null
+  const isManagerTurn = MANAGER_TURN_STATUSES.has(status)
+  const limitMs = (isManagerTurn ? deadlineMinutes : 1440) * 60 * 1000
+  const remainingMs = limitMs - (Date.now() - currentTurnStartedAt)
+  if (remainingMs <= 0) {
+    return { overdue: true, label: `+${Math.floor(-remainingMs / 60000)}分 超過` }
+  }
+  return { overdue: false, label: `残り${Math.ceil(remainingMs / 60000)}分` }
+}
+
 function mapRow(row) {
   return {
     id:              row.id,
@@ -79,8 +105,9 @@ function mapRow(row) {
     deadlineMinutes: row.deadline_minutes ?? 60,
     receivedAt:      new Date(row.received_at).getTime(),
     status:          row.status        ?? '受付済',
-    clientContact:   row.client_contact ?? '',
-    isMine:          false,
+    clientContact:          row.client_contact ?? '',
+    currentTurnStartedAt:   row.current_turn_started_at ? new Date(row.current_turn_started_at).getTime() : null,
+    isMine:                 false,
   }
 }
 
@@ -151,16 +178,18 @@ function StepProgressBar({ status }) {
   )
 }
 
-function ComplaintCard({ c, onClick, firstContactMin }) {
+function ComplaintCard({ c, onClick, firstContactMin, mineStatuses }) {
   const pc = PRIORITY[c.priority] ?? PRIORITY[1]
-  const timer = calcTimer(c.receivedAt, c.deadlineMinutes)
+  const isMyTurn  = mineStatuses?.includes(c.status) ?? false
+  const turnColor = calcTurnColor(c.status, c.currentTurnStartedAt, c.deadlineMinutes)
+  const turnTimer = isMyTurn ? calcTurnTimer(c.status, c.currentTurnStartedAt, c.deadlineMinutes) : null
 
   return (
     <div
       onClick={onClick}
       className={cn(
         'bg-white rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-all border-l-[5px] p-4 pl-5',
-        timer.overdue ? 'border-l-red-500' : pc.border
+        turnColor ?? pc.border
       )}
     >
       <div className="flex items-start gap-4">
@@ -188,17 +217,18 @@ function ComplaintCard({ c, onClick, firstContactMin }) {
         </div>
 
         {/* Timer + Status */}
-        <div className="shrink-0 text-right flex flex-col items-end gap-2 min-w-[110px]">
-          {timer.overdue ? (
+        <div className="shrink-0 text-right flex flex-col items-end gap-2 min-w-[100px]">
+          {turnTimer ? (
             <div>
-              <div className="text-[22px] font-black text-red-600 leading-none">{timer.main}</div>
-              <div className="text-sm text-red-500 font-semibold mt-0.5">{timer.sub}</div>
+              <div className={cn('text-[20px] font-black leading-none tabular-nums', turnTimer.overdue ? 'text-red-600' : 'text-gray-700')}>
+                {turnTimer.overdue ? '超過' : turnTimer.label}
+              </div>
+              <div className={cn('text-[10px] mt-0.5', turnTimer.overdue ? 'text-red-400' : 'text-gray-400')}>
+                {turnTimer.overdue ? turnTimer.label : '残り対応時間'}
+              </div>
             </div>
           ) : (
-            <div>
-              <div className={cn('text-[26px] font-black tabular-nums leading-none', timer.color)}>{timer.main}</div>
-              <div className="text-[11px] text-gray-400 mt-0.5">{timer.sub}</div>
-            </div>
+            <div className="h-9" />
           )}
           <span className={cn('text-xs font-semibold px-3 py-1 rounded-full', STATUS_BADGE[c.status] ?? 'bg-stone-100 text-stone-600')}>
             {c.status}
@@ -212,11 +242,14 @@ function ComplaintCard({ c, onClick, firstContactMin }) {
   )
 }
 
-function StatusComplaintCard({ c, onClick }) {
+function StatusComplaintCard({ c, onClick, mineStatuses }) {
   const stepIndex  = STATUS_TO_STEP[c.status] ?? 0
   const step       = STATUS_FLOW_STEPS[stepIndex]
   const initials   = c.assignee ? c.assignee.charAt(0) : '?'
-  const borderCls  = c.status === '承認完了' ? 'border-l-emerald-500' : step?.borderColor ?? 'border-l-stone-300'
+  const isMyTurn   = mineStatuses?.includes(c.status) ?? false
+  const turnColor  = calcTurnColor(c.status, c.currentTurnStartedAt, c.deadlineMinutes)
+  const turnTimer  = isMyTurn ? calcTurnTimer(c.status, c.currentTurnStartedAt, c.deadlineMinutes) : null
+  const borderCls  = turnColor ?? (c.status === '承認完了' ? 'border-l-emerald-500' : step?.borderColor ?? 'border-l-stone-300')
 
   return (
     <div
@@ -246,13 +279,20 @@ function StatusComplaintCard({ c, onClick }) {
 
       <StepProgressBar status={c.status} />
 
-      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-stone-100">
-        <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold shrink-0">
-          {initials}
+      <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-stone-100">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold shrink-0">
+            {initials}
+          </div>
+          <span className="text-xs text-gray-500 truncate">
+            今ここで止まっています：<span className="font-semibold text-gray-700">{c.assignee || '未割り当て'}</span> さん（担当）
+          </span>
         </div>
-        <span className="text-xs text-gray-500">
-          今ここで止まっています：<span className="font-semibold text-gray-700">{c.assignee || '未割り当て'}</span> さん（担当）
-        </span>
+        {turnTimer && (
+          <span className={cn('text-xs font-bold shrink-0', turnTimer.overdue ? 'text-red-500' : 'text-gray-500')}>
+            {turnTimer.label}
+          </span>
+        )}
       </div>
     </div>
   )
@@ -685,6 +725,7 @@ export default function Dashboard() {
               key={c.id}
               c={c}
               onClick={() => navigate(`/complaints/${c.id}`)}
+              mineStatuses={mineStatuses}
             />
           ) : (
             <ComplaintCard
@@ -692,6 +733,7 @@ export default function Dashboard() {
               c={c}
               onClick={() => navigate(`/complaints/${c.id}`)}
               firstContactMin={firstContactMap[c.id] ?? null}
+              mineStatuses={mineStatuses}
             />
           ))
         )}

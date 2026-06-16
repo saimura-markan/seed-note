@@ -61,11 +61,12 @@ export default function MyPage() {
     setSaving(true); setSaveMsg(null); setSaveErr(null)
     const name      = [lastNameJa,   firstNameJa  ].filter(Boolean).join(' ')
     const name_kana = [lastNameKana, firstNameKana].filter(Boolean).join(' ')
-    const { error } = await supabase.from('profiles').upsert({
-      id: user.id, name, name_kana, phone, department,
-    })
+    const [{ error: profileErr }, { error: authErr }] = await Promise.all([
+      supabase.from('profiles').upsert({ id: user.id, name, name_kana, phone, department }),
+      supabase.auth.updateUser({ data: { display_name: name } }),
+    ])
     setSaving(false)
-    if (error) setSaveErr(error.message)
+    if (profileErr || authErr) setSaveErr((profileErr || authErr).message)
     else setSaveMsg('変更を保存しました')
   }
 

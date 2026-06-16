@@ -20,6 +20,7 @@ export default function Layout({ user, onLogout }) {
 
   const role      = getRole(user)
   const roleLabel = ROLE_LABELS[role] || role
+  const hasRole   = !!(user?.app_metadata?.seed_note_role)
 
   useEffect(() => {
     if (!user?.id) return
@@ -35,6 +36,25 @@ export default function Layout({ user, onLogout }) {
   const handleLogout = async () => {
     await supabase.auth.signOut()
     onLogout()
+  }
+
+  if (!hasRole) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F5F0E8] px-4">
+        <div className="bg-white rounded-2xl shadow-sm p-8 max-w-sm w-full text-center">
+          <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">🌱</div>
+          <h2 className="text-lg font-bold text-gray-900 mb-2">アクセス権限がありません</h2>
+          <p className="text-sm text-gray-500 mb-6">管理者による権限付与をお待ちください。</p>
+          <button
+            onClick={handleLogout}
+            className="w-full h-11 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold transition-colors flex items-center justify-center gap-2"
+          >
+            <LogOut size={15} />
+            ログアウト
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (

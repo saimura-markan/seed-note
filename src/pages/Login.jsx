@@ -36,6 +36,29 @@ export default function Login({ onLogin }) {
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
 
+  // ─── パスワードリセット ─────────────────────────────────────────────────────
+  const [resetMode,    setResetMode]    = useState(false)
+  const [resetEmail,   setResetEmail]   = useState('')
+  const [resetSent,    setResetSent]    = useState(false)
+  const [resetLoading, setResetLoading] = useState(false)
+  const [resetError,   setResetError]   = useState('')
+
+  const handleResetPassword = async () => {
+    setResetLoading(true)
+    setResetError('')
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: 'https://seed-note-seven.vercel.app',
+    })
+    setResetLoading(false)
+    if (error) { setResetError(error.message); return }
+    setResetSent(true)
+  }
+
+  const backToLogin = () => {
+    setResetMode(false); setResetSent(false)
+    setResetEmail(''); setResetError('')
+  }
+
   return (
     <div className="h-screen flex flex-col md:flex-row overflow-hidden">
 
@@ -101,108 +124,186 @@ export default function Login({ onLogin }) {
             <img src="/seed-note-logo.png" alt="Seed Note" className="w-96 h-auto object-contain" />
           </div>
 
-          {/* タイトル */}
-          <div className="mb-7">
-            <h2 className="text-2xl font-bold mb-1" style={{ color: '#1a4731' }}>ログイン</h2>
-            <p className="text-sm text-gray-400">Seed Noteにログインしてください</p>
-          </div>
-
-          <div className="space-y-4">
-
-            {/* メールアドレス */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">メールアドレス</label>
-              <div className="relative">
-                <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  autoComplete="email"
-                  placeholder="メールアドレスを入力"
-                  className="w-full h-11 pl-9 pr-4 rounded-xl border border-stone-200 bg-stone-50 text-sm text-gray-900 placeholder:text-gray-300 focus:outline-none transition"
-                  onFocus={e => { e.target.style.boxShadow = '0 0 0 3px rgba(74,222,128,0.2)'; e.target.style.borderColor = '#86efac' }}
-                  onBlur={e => { e.target.style.boxShadow = ''; e.target.style.borderColor = '' }}
-                />
-              </div>
-            </div>
-
-            {/* パスワード */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">パスワード</label>
-              <div className="relative">
-                <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  autoComplete="current-password"
-                  placeholder="パスワードを入力"
-                  className="w-full h-11 pl-9 pr-10 rounded-xl border border-stone-200 bg-stone-50 text-sm text-gray-900 placeholder:text-gray-300 focus:outline-none transition"
-                  onFocus={e => { e.target.style.boxShadow = '0 0 0 3px rgba(74,222,128,0.2)'; e.target.style.borderColor = '#86efac' }}
-                  onBlur={e => { e.target.style.boxShadow = ''; e.target.style.borderColor = '' }}
-                />
-                <button type="button" onClick={() => setShowPassword(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 transition-colors">
-                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+          {resetMode ? (
+            /* ══ パスワードリセット画面 ══ */
+            resetSent ? (
+              /* 送信完了 */
+              <div className="space-y-5">
+                <div className="mb-7">
+                  <h2 className="text-2xl font-bold mb-1" style={{ color: '#1a4731' }}>メールを送信しました</h2>
+                  <p className="text-sm text-gray-400">パスワードリセットの手順をご確認ください</p>
+                </div>
+                <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
+                  <span className="font-bold">{resetEmail}</span> にリセットリンクを送信しました。メールのリンクをクリックしてパスワードを再設定してください。
+                </p>
+                <button type="button" onClick={backToLogin}
+                  className="w-full h-11 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50 transition-colors">
+                  ← ログインに戻る
                 </button>
               </div>
-            </div>
+            ) : (
+              /* リセットメール入力フォーム */
+              <div className="space-y-4">
+                <div className="mb-7">
+                  <h2 className="text-2xl font-bold mb-1" style={{ color: '#1a4731' }}>パスワードリセット</h2>
+                  <p className="text-sm text-gray-400">登録済みのメールアドレスにリセットリンクを送信します</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">メールアドレス</label>
+                  <div className="relative">
+                    <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" />
+                    <input
+                      type="email"
+                      value={resetEmail}
+                      onChange={e => setResetEmail(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && resetEmail) handleResetPassword() }}
+                      autoComplete="email"
+                      inputMode="email"
+                      placeholder="登録済みのメールアドレス"
+                      className="w-full h-11 pl-9 pr-4 rounded-xl border border-stone-200 bg-stone-50 text-sm text-gray-900 placeholder:text-gray-300 focus:outline-none transition"
+                      onFocus={e => { e.target.style.boxShadow = '0 0 0 3px rgba(74,222,128,0.2)'; e.target.style.borderColor = '#86efac' }}
+                      onBlur={e => { e.target.style.boxShadow = ''; e.target.style.borderColor = '' }}
+                    />
+                  </div>
+                </div>
+                {resetError && (
+                  <p className="text-red-500 text-sm bg-red-50 border border-red-100 rounded-xl px-4 py-2.5">{resetError}</p>
+                )}
+                <button
+                  onClick={handleResetPassword}
+                  disabled={!resetEmail || resetLoading}
+                  className="w-full h-12 rounded-xl bg-[#1a4731] hover:bg-[#14532d] text-white text-sm font-bold transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {resetLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                      送信中...
+                    </span>
+                  ) : 'リセットメールを送信'}
+                </button>
+                <div className="flex items-center gap-3 my-1">
+                  <div className="flex-1 h-px bg-stone-200" />
+                  <span className="text-xs text-gray-400">または</span>
+                  <div className="flex-1 h-px bg-stone-200" />
+                </div>
+                <p className="text-xs text-center text-gray-400">
+                  <button type="button" onClick={backToLogin} className="font-semibold hover:underline" style={{ color: '#16a34a' }}>
+                    ← ログインに戻る
+                  </button>
+                </p>
+              </div>
+            )
+          ) : (
+            /* ══ 通常ログインフォーム ══ */
+            <>
+              {/* タイトル */}
+              <div className="mb-7">
+                <h2 className="text-2xl font-bold mb-1" style={{ color: '#1a4731' }}>ログイン</h2>
+                <p className="text-sm text-gray-400">Seed Noteにログインしてください</p>
+              </div>
 
-            {/* ログインしたままにする ＋ パスワード忘れ */}
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-stone-300 accent-green-600" />
-                <span className="text-xs text-gray-500">ログインしたままにする</span>
-              </label>
-              <button type="button" className="text-xs hover:underline" style={{ color: '#16a34a' }}>
-                パスワードをお忘れの方はこちら
-              </button>
-            </div>
+              <div className="space-y-4">
 
-            {/* エラー */}
-            {error && (
-              <p className="text-red-500 text-sm bg-red-50 border border-red-100 rounded-xl px-4 py-2.5">
-                {error}
-              </p>
-            )}
+                {/* メールアドレス */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">メールアドレス</label>
+                  <div className="relative">
+                    <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      autoComplete="email"
+                      placeholder="メールアドレスを入力"
+                      className="w-full h-11 pl-9 pr-4 rounded-xl border border-stone-200 bg-stone-50 text-sm text-gray-900 placeholder:text-gray-300 focus:outline-none transition"
+                      onFocus={e => { e.target.style.boxShadow = '0 0 0 3px rgba(74,222,128,0.2)'; e.target.style.borderColor = '#86efac' }}
+                      onBlur={e => { e.target.style.boxShadow = ''; e.target.style.borderColor = '' }}
+                    />
+                  </div>
+                </div>
 
-            {/* ログインボタン */}
-            <button
-              onClick={handleLogin}
-              disabled={loading || !email || !password}
-              className="w-full h-12 rounded-xl bg-[#1a4731] hover:bg-[#14532d] text-white text-sm font-bold transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                  </svg>
-                  ログイン中...
-                </span>
-              ) : 'ログイン'}
-            </button>
+                {/* パスワード */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">パスワード</label>
+                  <div className="relative">
+                    <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      autoComplete="current-password"
+                      placeholder="パスワードを入力"
+                      className="w-full h-11 pl-9 pr-10 rounded-xl border border-stone-200 bg-stone-50 text-sm text-gray-900 placeholder:text-gray-300 focus:outline-none transition"
+                      onFocus={e => { e.target.style.boxShadow = '0 0 0 3px rgba(74,222,128,0.2)'; e.target.style.borderColor = '#86efac' }}
+                      onBlur={e => { e.target.style.boxShadow = ''; e.target.style.borderColor = '' }}
+                    />
+                    <button type="button" onClick={() => setShowPassword(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 transition-colors">
+                      {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+                </div>
 
-            {/* または区切り線 */}
-            <div className="flex items-center gap-3 my-1">
-              <div className="flex-1 h-px bg-stone-200" />
-              <span className="text-xs text-gray-400">または</span>
-              <div className="flex-1 h-px bg-stone-200" />
-            </div>
+                {/* ログインしたままにする ＋ パスワード忘れ */}
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)}
+                      className="w-4 h-4 rounded border-stone-300 accent-green-600" />
+                    <span className="text-xs text-gray-500">ログインしたままにする</span>
+                  </label>
+                  <button type="button" onClick={() => setResetMode(true)}
+                    className="text-xs hover:underline" style={{ color: '#16a34a' }}>
+                    パスワードをお忘れの方はこちら
+                  </button>
+                </div>
 
-            {/* 新規登録 */}
-            <p className="text-xs text-center text-gray-400">
-              アカウントをお持ちでない方は{' '}
-              <button type="button" onClick={() => navigate('/register')} className="font-semibold hover:underline" style={{ color: '#16a34a' }}>
-                新規登録はこちら
-              </button>
-            </p>
+                {/* エラー */}
+                {error && (
+                  <p className="text-red-500 text-sm bg-red-50 border border-red-100 rounded-xl px-4 py-2.5">
+                    {error}
+                  </p>
+                )}
 
-          </div>
+                {/* ログインボタン */}
+                <button
+                  onClick={handleLogin}
+                  disabled={loading || !email || !password}
+                  className="w-full h-12 rounded-xl bg-[#1a4731] hover:bg-[#14532d] text-white text-sm font-bold transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                      ログイン中...
+                    </span>
+                  ) : 'ログイン'}
+                </button>
+
+                {/* または区切り線 */}
+                <div className="flex items-center gap-3 my-1">
+                  <div className="flex-1 h-px bg-stone-200" />
+                  <span className="text-xs text-gray-400">または</span>
+                  <div className="flex-1 h-px bg-stone-200" />
+                </div>
+
+                {/* 新規登録 */}
+                <p className="text-xs text-center text-gray-400">
+                  アカウントをお持ちでない方は{' '}
+                  <button type="button" onClick={() => navigate('/register')} className="font-semibold hover:underline" style={{ color: '#16a34a' }}>
+                    新規登録はこちら
+                  </button>
+                </p>
+
+              </div>
+            </>
+          )}
 
           <p className="text-[11px] text-gray-300 text-center mt-10">
             © 2026 Seed Note. All rights reserved.

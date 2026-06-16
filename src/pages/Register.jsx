@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Mail, Lock, Eye, EyeOff, User } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 const DEPARTMENTS = [
@@ -17,26 +17,53 @@ const focusStyle = {
   onBlur:  e => { e.target.style.boxShadow = ''; e.target.style.borderColor = '' },
 }
 
+function getPasswordStrength(pw) {
+  if (!pw || pw.length < 8) return 'weak'
+  const hasUpper = /[A-Z]/.test(pw)
+  const hasLower = /[a-z]/.test(pw)
+  const hasDigit = /[0-9]/.test(pw)
+  if (!hasUpper || !hasLower || !hasDigit) return 'weak'
+  if (pw.length >= 12) return 'strong'
+  return 'normal'
+}
+
+const STRENGTH = {
+  weak:   { label: '弱',   bar: 'bg-red-500',     text: 'text-red-600',     width: 'w-1/3' },
+  normal: { label: '普通', bar: 'bg-amber-400',   text: 'text-amber-600',   width: 'w-2/3' },
+  strong: { label: '強',   bar: 'bg-emerald-500', text: 'text-emerald-600', width: 'w-full' },
+}
+
 export default function Register({ onLogin }) {
   const navigate = useNavigate()
 
-  const [fullName,         setFullName]         = useState('')
-  const [department,       setDepartment]       = useState('')
-  const [email,            setEmail]            = useState('')
-  const [password,         setPassword]         = useState('')
-  const [confirmPassword,  setConfirmPassword]  = useState('')
-  const [showPassword,     setShowPassword]     = useState(false)
-  const [showConfirm,      setShowConfirm]      = useState(false)
-  const [loading,          setLoading]          = useState(false)
-  const [error,            setError]            = useState('')
-  const [success,          setSuccess]          = useState(false)
+  const [lastName,        setLastName]        = useState('')
+  const [firstName,       setFirstName]       = useState('')
+  const [lastNameKana,    setLastNameKana]    = useState('')
+  const [firstNameKana,   setFirstNameKana]   = useState('')
+  const [department,      setDepartment]      = useState('')
+  const [email,           setEmail]           = useState('')
+  const [password,        setPassword]        = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword,    setShowPassword]    = useState(false)
+  const [showConfirm,     setShowConfirm]     = useState(false)
+  const [loading,         setLoading]         = useState(false)
+  const [error,           setError]           = useState('')
+  const [success,         setSuccess]         = useState(false)
 
-  const canSubmit = fullName && department && email && password && confirmPassword && !loading
+  const strength      = password ? getPasswordStrength(password) : null
+  const passwordValid = strength === 'normal' || strength === 'strong'
+  const canSubmit     = lastName && firstName && department && email && password && confirmPassword && passwordValid && !loading
 
   const handleRegister = async () => {
     setError('')
-    if (password !== confirmPassword) { setError('パスワードが一致しません'); return }
-    if (password.length < 6)          { setError('パスワードは6文字以上で入力してください'); return }
+    if (password !== confirmPassword) {
+      setError('パスワードが一致しません')
+      return
+    }
+    if (!passwordValid) {
+      setError('パスワードは8文字以上で、大文字・小文字・数字をそれぞれ1文字以上含めてください')
+      return
+    }
 
     setLoading(true)
     const { data, error: signUpErr } = await supabase.auth.signUp({ email, password })
@@ -44,20 +71,20 @@ export default function Register({ onLogin }) {
 
     const userId = data?.user?.id
     if (userId) {
+      const name      = [lastName,     firstName    ].filter(Boolean).join(' ')
+      const name_kana = [lastNameKana, firstNameKana].filter(Boolean).join(' ')
       await supabase.from('profiles').upsert({
-        id:         userId,
-        name:       fullName,
-        department: department,
+        id: userId,
+        name,
+        ...(name_kana && { name_kana }),
+        department,
       })
     }
 
     setLoading(false)
-
     if (data?.session) {
-      // 確認メール不要の場合：即ログイン
       onLogin?.(data.user)
     } else {
-      // 確認メールが必要な場合
       setSuccess(true)
     }
   }
@@ -108,8 +135,8 @@ export default function Register({ onLogin }) {
               <select
                 value={department}
                 onChange={e => setDepartment(e.target.value)}
-                className="w-full h-11 px-4 rounded-xl border border-stone-200 bg-stone-50 text-sm text-gray-900 focus:outline-none transition"
-                style={{ color: department ? '#111827' : '#d1d5db' }}
+                className="w-full h-11 px-4 rounded-xl border border-stone-200 bg-stone-50 text-sm focus:outline-none transition"
+                style={{ color: department ? '#111827' : '#9ca3af' }}
                 {...focusStyle}
               >
                 <option value="">部署を選択してください</option>
@@ -117,18 +144,49 @@ export default function Register({ onLogin }) {
               </select>
             </div>
 
-            {/* 名前 */}
+            {/* 担当者名（姓・名） */}
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">お名前 <span className="text-red-500">*</span></label>
-              <div className="relative">
-                <User size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" />
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">担当者名 <span className="text-red-500">*</span></label>
+              <div className="grid grid-cols-2 gap-3">
                 <input
                   type="text"
-                  value={fullName}
-                  onChange={e => setFullName(e.target.value)}
-                  placeholder="山田 太郎"
-                  autoComplete="name"
-                  className={inputCls + ' pl-9'}
+                  value={lastName}
+                  onChange={e => setLastName(e.target.value)}
+                  placeholder="姓"
+                  autoComplete="family-name"
+                  className={inputCls}
+                  {...focusStyle}
+                />
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={e => setFirstName(e.target.value)}
+                  placeholder="名"
+                  autoComplete="given-name"
+                  className={inputCls}
+                  {...focusStyle}
+                />
+              </div>
+            </div>
+
+            {/* ふりがな（せい・めい） */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">ふりがな</label>
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  value={lastNameKana}
+                  onChange={e => setLastNameKana(e.target.value)}
+                  placeholder="せい"
+                  className={inputCls}
+                  {...focusStyle}
+                />
+                <input
+                  type="text"
+                  value={firstNameKana}
+                  onChange={e => setFirstNameKana(e.target.value)}
+                  placeholder="めい"
+                  className={inputCls}
                   {...focusStyle}
                 />
               </div>
@@ -160,7 +218,7 @@ export default function Register({ onLogin }) {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  placeholder="6文字以上"
+                  placeholder="8文字以上・大文字・小文字・数字を含む"
                   autoComplete="new-password"
                   className={inputCls + ' pl-9 pr-10'}
                   {...focusStyle}
@@ -170,6 +228,22 @@ export default function Register({ onLogin }) {
                   {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
+
+              {/* 強度インジケーター */}
+              {strength && (
+                <div className="mt-2">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-gray-400">パスワード強度</span>
+                    <span className={`font-bold ${STRENGTH[strength].text}`}>{STRENGTH[strength].label}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-stone-100 overflow-hidden">
+                    <div className={`h-full rounded-full transition-all duration-300 ${STRENGTH[strength].bar} ${STRENGTH[strength].width}`} />
+                  </div>
+                  {strength === 'weak' && (
+                    <p className="text-[11px] text-red-500 mt-1">大文字・小文字・数字をそれぞれ含む8文字以上で設定してください</p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* パスワード確認 */}
@@ -191,6 +265,9 @@ export default function Register({ onLogin }) {
                   {showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
+              {confirmPassword && password !== confirmPassword && (
+                <p className="text-[11px] text-red-500 mt-1">パスワードが一致しません</p>
+              )}
             </div>
 
             {/* Error */}

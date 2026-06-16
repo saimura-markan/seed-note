@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import { getRole } from './lib/utils'
@@ -27,16 +27,19 @@ function RoleGuard({ user, allow, deny, children }) {
 export default function App() {
   const [user, setUser] = useState(undefined)
   const [recoveryMode, setRecoveryMode] = useState(false)
+  const recoveryRef = useRef(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null)
+      if (!recoveryRef.current) setUser(data.session?.user ?? null)
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
+        recoveryRef.current = true
         setRecoveryMode(true)
         return
       }
+      if (recoveryRef.current) return
       setUser(session?.user ?? null)
     })
     return () => subscription.unsubscribe()
@@ -51,7 +54,7 @@ export default function App() {
   }
 
   if (recoveryMode) {
-    return <ResetPassword onDone={() => { setRecoveryMode(false); setUser(null) }} />
+    return <ResetPassword onDone={() => { recoveryRef.current = false; setRecoveryMode(false); setUser(null) }} />
   }
 
   return (

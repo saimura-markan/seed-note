@@ -9,23 +9,28 @@ export default function ResetPassword({ onDone }) {
   const [showPwConfirm, setShowPwConfirm] = useState(false)
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
-  const [done, setDone] = useState(false)
   const [sessionLoading, setSessionLoading] = useState(true)
+  const [sessionError, setSessionError] = useState('')
+  const [done, setDone] = useState(false)
 
   useEffect(() => {
-    // Supabase が detectSessionInUrl:true で自動コード交換後に PASSWORD_RECOVERY を発火する
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setSessionLoading(false)
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    const accessToken  = params.get('access_token')
+    const refreshToken = params.get('refresh_token')
+    if (!accessToken || !refreshToken) {
+      setSessionError('無効なリンクです。パスワードリセットメールを再度お送りください。')
+      setSessionLoading(false)
+      return
+    }
+    // JWT issued at future エラー対策: 1秒待機してから setSession（E-Liと同じ）
+    const timer = setTimeout(async () => {
+      const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+      if (error) {
+        setSessionError('リンクの有効期限が切れています。もう一度パスワードリセットをお試しください。')
       }
-    })
-
-    // イベントを逃した場合のフォールバック: すでにセッションがあればそのまま表示
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setSessionLoading(false)
-    })
-
-    return () => subscription.unsubscribe()
+      setSessionLoading(false)
+    }, 1000)
+    return () => clearTimeout(timer)
   }, [])
 
   const handleSubmit = async () => {
@@ -56,20 +61,11 @@ export default function ResetPassword({ onDone }) {
             <h2 className="text-xl font-bold text-gray-800">パスワードを変更しました</h2>
             <p className="text-sm text-gray-500">新しいパスワードでログインしてください</p>
             <button
-              onClick={async () => { await supabase.auth.signOut(); onDone() }}
+              onClick={onDone}
               className="w-full h-11 rounded-xl bg-[#1a4731] text-white text-sm font-bold hover:bg-[#14532d] transition-colors"
             >
               ログイン画面へ
             </button>
-          </div>
-
-        ) : sessionLoading ? (
-          <div className="text-center py-8 space-y-3">
-            <svg className="animate-spin h-8 w-8 text-emerald-600 mx-auto" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-            </svg>
-            <p className="text-sm text-gray-400">リンクを確認中...</p>
           </div>
 
         ) : (
@@ -121,13 +117,26 @@ export default function ResetPassword({ onDone }) {
               {errors.pwConfirm && <p className="text-red-500 text-xs mt-1">{errors.pwConfirm}</p>}
             </div>
 
-            <button
-              onClick={handleSubmit}
-              disabled={submitting}
-              className="w-full h-12 rounded-xl bg-[#1a4731] hover:bg-[#14532d] text-white text-sm font-bold transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {submitting ? '更新中...' : 'パスワードを変更する'}
-            </button>
+            {sessionError && (
+              <p className="text-red-500 text-sm bg-red-50 border border-red-100 rounded-xl px-4 py-2.5">
+                ⚠️ {sessionError}
+              </p>
+            )}
+
+            {sessionError ? (
+              <button onClick={onDone}
+                className="w-full h-11 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50 transition-colors">
+                ← ログインに戻る
+              </button>
+            ) : (
+              <button
+                onClick={handleSubmit}
+                disabled={sessionLoading || submitting}
+                className="w-full h-12 rounded-xl bg-[#1a4731] hover:bg-[#14532d] text-white text-sm font-bold transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {submitting ? '更新中...' : sessionLoading ? '準備中...' : 'パスワードを変更する'}
+              </button>
+            )}
           </div>
         )}
 

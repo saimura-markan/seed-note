@@ -26,10 +26,10 @@ function RoleGuard({ user, allow, deny, children }) {
 
 export default function App() {
   const [user, setUser] = useState(undefined)
-  const hasCode = new URLSearchParams(window.location.search).has('code')
-  const [recoveryMode, setRecoveryMode] = useState(hasCode)
-  const recoveryRef = useRef(hasCode)
-  const signInTimerRef = useRef(null)
+  // E-Liと同じ方式: URLハッシュの type=recovery で即時recoveryMode開始
+  const initialRecovery = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('type') === 'recovery'
+  const [recoveryMode, setRecoveryMode] = useState(initialRecovery)
+  const recoveryRef = useRef(initialRecovery)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -37,32 +37,15 @@ export default function App() {
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
-        // SIGNED_IN より先に来た場合はタイマーをキャンセル
-        if (signInTimerRef.current) {
-          clearTimeout(signInTimerRef.current)
-          signInTimerRef.current = null
-        }
         recoveryRef.current = true
         setRecoveryMode(true)
         return
       }
-      // PASSWORD_RECOVERY後のSIGNED_INは無視
-      if (event === 'SIGNED_IN' && recoveryRef.current) return
+      // recovery完了まで全イベント無視（E-Liの resetpassword 維持ロジックと同等）
       if (recoveryRef.current) return
-      if (event === 'SIGNED_IN') {
-        // PASSWORD_RECOVERYが後続する場合に備えて1tick遅延
-        signInTimerRef.current = setTimeout(() => {
-          signInTimerRef.current = null
-          if (!recoveryRef.current) setUser(session?.user ?? null)
-        }, 0)
-        return
-      }
       setUser(session?.user ?? null)
     })
-    return () => {
-      subscription.unsubscribe()
-      if (signInTimerRef.current) clearTimeout(signInTimerRef.current)
-    }
+    return () => subscription.unsubscribe()
   }, [])
 
   if (user === undefined) {

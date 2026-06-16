@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Lock, Eye, EyeOff } from 'lucide-react'
 
@@ -10,6 +10,23 @@ export default function ResetPassword({ onDone }) {
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
+  const [sessionLoading, setSessionLoading] = useState(true)
+  const [sessionError, setSessionError] = useState('')
+
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get('code')
+    if (!code) {
+      setSessionError('無効なリンクです。パスワードリセットメールを再度お送りください。')
+      setSessionLoading(false)
+      return
+    }
+    supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+      if (error) {
+        setSessionError('リンクの有効期限が切れています。もう一度パスワードリセットをお試しください。')
+      }
+      setSessionLoading(false)
+    })
+  }, [])
 
   const handleSubmit = async () => {
     const errs = {}
@@ -32,6 +49,7 @@ export default function ResetPassword({ onDone }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F5F0E8] px-4">
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-sm border border-stone-100 p-8">
+
         {done ? (
           <div className="text-center space-y-4">
             <p className="text-4xl">✅</p>
@@ -44,6 +62,32 @@ export default function ResetPassword({ onDone }) {
               ログイン画面へ
             </button>
           </div>
+
+        ) : sessionLoading ? (
+          <div className="text-center py-8 space-y-3">
+            <svg className="animate-spin h-8 w-8 text-emerald-600 mx-auto" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+            </svg>
+            <p className="text-sm text-gray-400">リンクを確認中...</p>
+          </div>
+
+        ) : sessionError ? (
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-2xl font-bold mb-1" style={{ color: '#1a4731' }}>エラーが発生しました</h2>
+            </div>
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+              ⚠️ {sessionError}
+            </p>
+            <button
+              onClick={onDone}
+              className="w-full h-11 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50 transition-colors"
+            >
+              ← ログインに戻る
+            </button>
+          </div>
+
         ) : (
           <div className="space-y-5">
             <div>
@@ -94,14 +138,15 @@ export default function ResetPassword({ onDone }) {
             </div>
 
             <button
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="w-full h-12 rounded-xl bg-[#1a4731] hover:bg-[#14532d] text-white text-sm font-bold transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {submitting ? '更新中...' : 'パスワードを変更する'}
-              </button>
+              onClick={handleSubmit}
+              disabled={submitting}
+              className="w-full h-12 rounded-xl bg-[#1a4731] hover:bg-[#14532d] text-white text-sm font-bold transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {submitting ? '更新中...' : 'パスワードを変更する'}
+            </button>
           </div>
         )}
+
       </div>
     </div>
   )

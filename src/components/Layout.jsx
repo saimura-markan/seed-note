@@ -10,6 +10,7 @@ const ROLE_LABELS = {
   executive: '役員',
   manager:   '主任',
   judgment:  '審査担当',
+  staff:     'スタッフ',
   user:      'スタッフ',
 }
 

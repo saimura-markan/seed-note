@@ -105,7 +105,7 @@ export default function MyPage() {
         {(() => {
           const ROLE_LABELS = {
             admin: '管理者', director: '事業責任者', executive: '役員',
-            manager: '主任', judgment: '審査担当', user: 'スタッフ',
+            manager: '主任', judgment: '審査担当', staff: 'スタッフ', user: 'スタッフ',
           }
           const roleLabel = ROLE_LABELS[role] || role
           return (

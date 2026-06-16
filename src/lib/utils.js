@@ -14,6 +14,7 @@ export function cn(...inputs) {
  *   director  → 事業責任者
  *   executive → 役員
  *   manager   → 主任クラス
+ *   staff     → スタッフ（受付入力・閲覧のみ。対応入力・是正案・報告書・承認は不可）
  */
 export function getRole(user) {
   const meta = user?.app_metadata ?? {}

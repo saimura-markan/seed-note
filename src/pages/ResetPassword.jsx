@@ -11,21 +11,21 @@ export default function ResetPassword({ onDone }) {
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
   const [sessionLoading, setSessionLoading] = useState(true)
-  const [sessionError, setSessionError] = useState('')
 
   useEffect(() => {
-    const code = new URLSearchParams(window.location.search).get('code')
-    if (!code) {
-      setSessionError('無効なリンクです。パスワードリセットメールを再度お送りください。')
-      setSessionLoading(false)
-      return
-    }
-    supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
-      if (error) {
-        setSessionError('リンクの有効期限が切れています。もう一度パスワードリセットをお試しください。')
+    // Supabase が detectSessionInUrl:true で自動コード交換後に PASSWORD_RECOVERY を発火する
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setSessionLoading(false)
       }
-      setSessionLoading(false)
     })
+
+    // イベントを逃した場合のフォールバック: すでにセッションがあればそのまま表示
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) setSessionLoading(false)
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
   const handleSubmit = async () => {
@@ -70,22 +70,6 @@ export default function ResetPassword({ onDone }) {
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
             </svg>
             <p className="text-sm text-gray-400">リンクを確認中...</p>
-          </div>
-
-        ) : sessionError ? (
-          <div className="space-y-5">
-            <div>
-              <h2 className="text-2xl font-bold mb-1" style={{ color: '#1a4731' }}>エラーが発生しました</h2>
-            </div>
-            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
-              ⚠️ {sessionError}
-            </p>
-            <button
-              onClick={onDone}
-              className="w-full h-11 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50 transition-colors"
-            >
-              ← ログインに戻る
-            </button>
           </div>
 
         ) : (

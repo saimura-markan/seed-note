@@ -18,13 +18,15 @@ const focusStyle = {
 }
 
 function getPasswordStrength(pw) {
-  if (!pw || pw.length < 8) return 'weak'
-  const hasUpper = /[A-Z]/.test(pw)
-  const hasLower = /[a-z]/.test(pw)
-  const hasDigit = /[0-9]/.test(pw)
-  if (!hasUpper || !hasLower || !hasDigit) return 'weak'
-  if (pw.length >= 12) return 'strong'
-  return 'normal'
+  if (!pw) return null
+  let score = 0
+  if (pw.length >= 8)    score++
+  if (/[A-Z]/.test(pw)) score++
+  if (/[a-z]/.test(pw)) score++
+  if (/[0-9]/.test(pw)) score++
+  if (score <= 2) return 'weak'
+  if (score === 3) return 'normal'
+  return 'strong'
 }
 
 const STRENGTH = {
@@ -50,8 +52,8 @@ export default function Register({ onLogin }) {
   const [error,           setError]           = useState('')
   const [success,         setSuccess]         = useState(false)
 
-  const strength      = password ? getPasswordStrength(password) : null
-  const passwordValid = strength === 'normal' || strength === 'strong'
+  const strength      = getPasswordStrength(password)
+  const passwordValid = strength === 'strong'
   const canSubmit     = lastName && firstName && department && email && password && confirmPassword && passwordValid && !loading
 
   const handleRegister = async () => {
@@ -203,6 +205,7 @@ export default function Register({ onLogin }) {
                   onChange={e => setEmail(e.target.value)}
                   placeholder="example@company.jp"
                   autoComplete="email"
+                  inputMode="email"
                   className={inputCls + ' pl-9'}
                   {...focusStyle}
                 />
@@ -220,6 +223,7 @@ export default function Register({ onLogin }) {
                   onChange={e => setPassword(e.target.value)}
                   placeholder="8文字以上・大文字・小文字・数字を含む"
                   autoComplete="new-password"
+                  inputMode="text"
                   className={inputCls + ' pl-9 pr-10'}
                   {...focusStyle}
                 />
@@ -239,7 +243,7 @@ export default function Register({ onLogin }) {
                   <div className="h-1.5 rounded-full bg-stone-100 overflow-hidden">
                     <div className={`h-full rounded-full transition-all duration-300 ${STRENGTH[strength].bar} ${STRENGTH[strength].width}`} />
                   </div>
-                  {strength === 'weak' && (
+                  {strength !== 'strong' && (
                     <p className="text-[11px] text-red-500 mt-1">大文字・小文字・数字をそれぞれ含む8文字以上で設定してください</p>
                   )}
                 </div>
@@ -257,6 +261,7 @@ export default function Register({ onLogin }) {
                   onChange={e => setConfirmPassword(e.target.value)}
                   placeholder="もう一度入力"
                   autoComplete="new-password"
+                  inputMode="text"
                   className={inputCls + ' pl-9 pr-10'}
                   {...focusStyle}
                 />

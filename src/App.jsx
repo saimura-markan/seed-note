@@ -28,6 +28,7 @@ export default function App() {
   const [user, setUser] = useState(undefined)
   const [recoveryMode, setRecoveryMode] = useState(false)
   const recoveryRef = useRef(false)
+  const signInTimerRef = useRef(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -35,14 +36,32 @@ export default function App() {
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
+        // SIGNED_IN より先に来た場合はタイマーをキャンセル
+        if (signInTimerRef.current) {
+          clearTimeout(signInTimerRef.current)
+          signInTimerRef.current = null
+        }
         recoveryRef.current = true
         setRecoveryMode(true)
         return
       }
+      // PASSWORD_RECOVERY後のSIGNED_INは無視
+      if (event === 'SIGNED_IN' && recoveryRef.current) return
       if (recoveryRef.current) return
+      if (event === 'SIGNED_IN') {
+        // PASSWORD_RECOVERYが後続する場合に備えて1tick遅延
+        signInTimerRef.current = setTimeout(() => {
+          signInTimerRef.current = null
+          if (!recoveryRef.current) setUser(session?.user ?? null)
+        }, 0)
+        return
+      }
       setUser(session?.user ?? null)
     })
-    return () => subscription.unsubscribe()
+    return () => {
+      subscription.unsubscribe()
+      if (signInTimerRef.current) clearTimeout(signInTimerRef.current)
+    }
   }, [])
 
   if (user === undefined) {

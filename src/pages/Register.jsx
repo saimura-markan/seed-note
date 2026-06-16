@@ -121,8 +121,8 @@ export default function Register({ onLogin }) {
       <div className="w-full max-w-sm">
 
         {/* Logo */}
-        <div className="flex justify-center mb-6">
-          <img src="/seed-note-logo.png" alt="Seed Note" className="h-20 w-auto object-contain" style={{ mixBlendMode: 'multiply' }} />
+        <div className="flex justify-center mb-8 mt-4">
+          <img src="/seed-note-logo.png" alt="Seed Note" className="w-96 h-auto object-contain" />
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm p-7">
@@ -299,19 +299,18 @@ export default function Register({ onLogin }) {
 
           </div>
 
-          <div className="flex items-center gap-3 my-4">
+          <div className="flex items-center gap-3 my-1">
             <div className="flex-1 h-px bg-stone-200" />
             <span className="text-xs text-gray-400">または</span>
             <div className="flex-1 h-px bg-stone-200" />
           </div>
 
-          <button
-            type="button"
-            onClick={() => navigate('/login')}
-            className="w-full h-11 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50 transition-colors"
-          >
-            ← ログインはこちら
-          </button>
+          <p className="text-xs text-center text-gray-400">
+            すでにアカウントをお持ちの方は{' '}
+            <button type="button" onClick={() => navigate('/login')} className="font-semibold hover:underline" style={{ color: '#16a34a' }}>
+              ← ログインはこちら
+            </button>
+          </p>
         </div>
 
         <p className="text-[11px] text-gray-400 text-center mt-6">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Lock, Eye, EyeOff } from 'lucide-react'
 
@@ -9,29 +9,7 @@ export default function ResetPassword({ onDone }) {
   const [showPwConfirm, setShowPwConfirm] = useState(false)
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
-  const [sessionLoading, setSessionLoading] = useState(true)
-  const [sessionError, setSessionError] = useState('')
   const [done, setDone] = useState(false)
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
-    const accessToken = params.get('access_token')
-    const refreshToken = params.get('refresh_token')
-    if (!accessToken || !refreshToken) {
-      setSessionError('無効なリンクです。パスワードリセットメールを再度お送りください。')
-      setSessionLoading(false)
-      return
-    }
-    // JWT issued at future エラー対策: 1秒待機してからsetSession
-    const timer = setTimeout(async () => {
-      const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
-      if (error) {
-        setSessionError('リンクの有効期限が切れています。もう一度パスワードリセットをお試しください。')
-      }
-      setSessionLoading(false)
-    }, 1000)
-    return () => clearTimeout(timer)
-  }, [])
 
   const handleSubmit = async () => {
     const errs = {}
@@ -115,26 +93,13 @@ export default function ResetPassword({ onDone }) {
               {errors.pwConfirm && <p className="text-red-500 text-xs mt-1">{errors.pwConfirm}</p>}
             </div>
 
-            {sessionError && (
-              <p className="text-red-500 text-sm bg-red-50 border border-red-100 rounded-xl px-4 py-2.5">
-                ⚠️ {sessionError}
-              </p>
-            )}
-
-            {sessionError ? (
-              <button onClick={onDone}
-                className="w-full h-11 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50 transition-colors">
-                ← ログインに戻る
-              </button>
-            ) : (
-              <button
+            <button
                 onClick={handleSubmit}
-                disabled={sessionLoading || submitting}
+                disabled={submitting}
                 className="w-full h-12 rounded-xl bg-[#1a4731] hover:bg-[#14532d] text-white text-sm font-bold transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {submitting ? '更新中...' : sessionLoading ? '準備中...' : 'パスワードを変更する'}
+                {submitting ? '更新中...' : 'パスワードを変更する'}
               </button>
-            )}
           </div>
         )}
       </div>

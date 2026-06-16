@@ -121,9 +121,15 @@ export default function Register({ onLogin }) {
       <div className="w-full max-w-sm">
 
         {/* Logo */}
-        <div className="flex justify-center mb-8 mt-4">
+        <div className="flex justify-center mb-4 mt-4">
           <img src="/seed-note-logo.png" alt="Seed Note" className="w-96 h-auto object-contain" />
         </div>
+
+        <p className="text-xs text-center text-gray-400 mb-5">
+          <button type="button" onClick={() => navigate('/login')} className="font-semibold hover:underline" style={{ color: '#16a34a' }}>
+            ← ログインに戻る
+          </button>
+        </p>
 
         <div className="bg-white rounded-2xl shadow-sm p-7">
           <h2 className="text-xl font-bold text-gray-900 mb-1">新規アカウント登録</h2>

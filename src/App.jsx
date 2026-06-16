@@ -26,8 +26,9 @@ function RoleGuard({ user, allow, deny, children }) {
 
 export default function App() {
   const [user, setUser] = useState(undefined)
-  const [recoveryMode, setRecoveryMode] = useState(false)
-  const recoveryRef = useRef(false)
+  const hasCode = new URLSearchParams(window.location.search).has('code')
+  const [recoveryMode, setRecoveryMode] = useState(hasCode)
+  const recoveryRef = useRef(hasCode)
   const signInTimerRef = useRef(null)
 
   useEffect(() => {

@@ -15,6 +15,7 @@ import MyPage from './pages/MyPage'
 import Analytics from './pages/Analytics'
 import BulletinBoard from './pages/BulletinBoard'
 import Register from './pages/Register'
+import ResetPassword from './pages/ResetPassword'
 
 function RoleGuard({ user, allow, deny, children }) {
   const role = getRole(user)
@@ -25,12 +26,17 @@ function RoleGuard({ user, allow, deny, children }) {
 
 export default function App() {
   const [user, setUser] = useState(undefined)
+  const [recoveryMode, setRecoveryMode] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setUser(data.session?.user ?? null)
     })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setRecoveryMode(true)
+        return
+      }
       setUser(session?.user ?? null)
     })
     return () => subscription.unsubscribe()
@@ -42,6 +48,10 @@ export default function App() {
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
       </div>
     )
+  }
+
+  if (recoveryMode) {
+    return <ResetPassword onDone={() => { setRecoveryMode(false); setUser(null) }} />
   }
 
   return (

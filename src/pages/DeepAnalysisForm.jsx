@@ -142,6 +142,10 @@ export default function DeepAnalysisForm() {
       setActionDeadline(deep[0].action_deadline || '')
       setActionProgress(deep[0].action_progress || '未着手')
     }
+    // statusが深掘り提出済みでdepAnalysisデータがない場合、改善報告書確認ステップをスキップ
+    if (c && c.status === '深掘り提出' && !(deep && deep[0])) {
+      setCorrectionApproved(true)
+    }
     setLoading(false)
   }, [id])
 
@@ -264,8 +268,22 @@ export default function DeepAnalysisForm() {
   const isApprovalPhase = ['是正案提出', '是正案差し戻し'].includes(complaint.status)
 
   // タイマー（改善報告書の提出日時から24時間）
+  const isDeepSubmitted = !!existing || complaint.status === '深掘り提出'
   const timerBase = correction?.created_at || complaint.supervisor_reported_at
   const TimerBanner = timerBase ? (() => {
+    if (isDeepSubmitted) {
+      const startMs = new Date(timerBase).getTime()
+      const endMs = existing?.created_at ? new Date(existing.created_at).getTime() : Date.now()
+      const totalMin = Math.floor((endMs - startMs) / 60000)
+      const h = Math.floor(totalMin / 60); const m = totalMin % 60
+      const elapsed = h > 0 ? `${h}時間${m}分` : `${m}分`
+      return (
+        <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-3 mb-5">
+          <span className="text-xs font-semibold text-emerald-700">✅ 深掘り分析 提出済み</span>
+          <span className="text-sm font-bold text-emerald-800">所要時間 {elapsed}</span>
+        </div>
+      )
+    }
     const deadline = new Date(timerBase).getTime() + 24 * 60 * 60 * 1000
     const remaining = Math.floor((deadline - Date.now()) / 1000)
     const pad = n => String(Math.floor(Math.abs(n))).padStart(2, '0')
@@ -460,7 +478,7 @@ export default function DeepAnalysisForm() {
       )}
 
       {/* ── 改善報告書提出フェーズ ── */}
-      {(complaint.status === '改善報告書提出' || (complaint.status === '是正案承認' && correction)) && (
+      {(complaint.status === '改善報告書提出' || (complaint.status === '是正案承認' && correction) || (complaint.status === '深掘り提出' && !existing)) && (
         <>
           {/* 改善報告書の内容 */}
           {correction && (

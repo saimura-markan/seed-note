@@ -13,15 +13,30 @@ const BULLETIN_PERIODS = [
 ]
 
 function BulletinCard({ post }) {
-  const c = post.content || {}
+  const c    = post.content || {}
+  const deep = post.deep    || {}
   const date = post.created_at
     ? new Date(post.created_at).toLocaleDateString('ja-JP', { year: 'numeric', month: 'numeric', day: 'numeric' })
     : '—'
   const contactCount = Array.isArray(c.contact_logs) ? c.contact_logs.length : 0
+
+  // deep analysis フィールドは complaint_deep_analysis を優先、content をフォールバック
+  const rootCause   = deep.root_cause   || c.root_cause   || ''
+  const rootTheme   = deep.root_theme   || c.root_theme   || ''
+  const rootDetail  = deep.root_detail  || c.root_detail  || ''
+  const orgImprove  = deep.org_improvement || c.org_improvement || ''
+  const horizDepts  = Array.isArray(deep.horizontal_departments) ? deep.horizontal_departments
+                    : Array.isArray(c.horizontal_departments)    ? c.horizontal_departments
+                    : []
+  const horizContent   = deep.horizontal_content  || c.horizontal_content  || ''
+  const actionAssignee = deep.action_assignee     || c.action_assignee     || ''
+  const actionDeadline = deep.action_deadline     || c.action_deadline     || ''
+  const actionProgress = deep.action_progress     || c.action_progress     || ''
+
   const progressBadge =
-    c.action_progress === '完了'   ? 'bg-emerald-100 text-emerald-700' :
-    c.action_progress === '進行中' ? 'bg-blue-100 text-blue-700'       :
-                                     'bg-stone-100 text-stone-600'
+    actionProgress === '完了'   ? 'bg-emerald-100 text-emerald-700' :
+    actionProgress === '進行中' ? 'bg-blue-100 text-blue-700'       :
+                                  'bg-stone-100 text-stone-600'
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border-l-4 border-l-emerald-400 overflow-hidden">
@@ -58,33 +73,47 @@ function BulletinCard({ post }) {
             <p className="text-sm text-gray-700 leading-relaxed">{c.improvement}</p>
           </div>
         )}
-        {(c.root_cause || c.root_theme) && (
+        {(rootCause || rootTheme || rootDetail) && (
           <div>
-            <p className="text-[11px] font-bold text-gray-400 mb-1">■ 真因（なぜ起きたか）</p>
-            {c.root_cause && <p className="text-sm text-gray-700 leading-relaxed">{c.root_cause}</p>}
-            {c.root_theme && (
-              <span className="inline-block mt-1 text-xs font-semibold bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded-full">
-                カテゴリー：{c.root_theme}
+            <p className="text-[11px] font-bold text-gray-400 mb-1">■ 真因分析</p>
+            {rootTheme && (
+              <span className="inline-block mb-1.5 text-xs font-semibold bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded-full">
+                カテゴリー：{rootTheme}
               </span>
+            )}
+            {rootCause && <p className="text-sm text-gray-700 leading-relaxed">{rootCause}</p>}
+            {rootDetail && (
+              <p className="text-xs text-gray-500 leading-relaxed mt-1 bg-stone-50 rounded-lg px-3 py-2">{rootDetail}</p>
             )}
           </div>
         )}
-        {(c.org_improvement || c.action_assignee || c.action_deadline) && (
+        {(horizDepts.length > 0 || horizContent) && (
           <div>
-            <p className="text-[11px] font-bold text-gray-400 mb-1">■ 組織対策（再発防止）</p>
-            {c.org_improvement && (
-              <p className="text-sm text-gray-700 leading-relaxed mb-2">{c.org_improvement}</p>
+            <p className="text-[11px] font-bold text-gray-400 mb-1">■ 横展開</p>
+            {horizDepts.length > 0 && (
+              <p className="text-xs text-gray-600 mb-1">
+                対象部署：<strong className="text-gray-800">{horizDepts.join('・')}</strong>
+              </p>
+            )}
+            {horizContent && <p className="text-sm text-gray-700 leading-relaxed">{horizContent}</p>}
+          </div>
+        )}
+        {(orgImprove || actionAssignee || actionDeadline) && (
+          <div>
+            <p className="text-[11px] font-bold text-gray-400 mb-1">■ 組織改善策（再発防止）</p>
+            {orgImprove && (
+              <p className="text-sm text-gray-700 leading-relaxed mb-2">{orgImprove}</p>
             )}
             <div className="flex items-center gap-3 flex-wrap text-xs">
-              {c.action_assignee && (
-                <span className="text-gray-600">担当：<strong className="text-gray-800">{c.action_assignee}</strong></span>
+              {actionAssignee && (
+                <span className="text-gray-600">担当：<strong className="text-gray-800">{actionAssignee}</strong></span>
               )}
-              {c.action_deadline && (
-                <span className="text-gray-600">期限：<strong className="text-gray-800">{c.action_deadline}</strong></span>
+              {actionDeadline && (
+                <span className="text-gray-600">期限：<strong className="text-gray-800">{actionDeadline}</strong></span>
               )}
-              {c.action_progress && (
+              {actionProgress && (
                 <span className={cn('font-bold px-2.5 py-0.5 rounded-full', progressBadge)}>
-                  {c.action_progress}
+                  {actionProgress}
                 </span>
               )}
             </div>
@@ -104,14 +133,28 @@ export default function BulletinBoard() {
   const [bulletinPeriod, setBulletinPeriod] = useState('all')
 
   useEffect(() => {
-    supabase
-      .from('bulletin_board')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        if (data) setBulletinPosts(data)
-        setBulletinLoading(false)
-      })
+    const load = async () => {
+      const { data: posts } = await supabase
+        .from('bulletin_board')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (!posts) { setBulletinLoading(false); return }
+
+      // complaint_idのリストでdeep_analysisを一括取得
+      const ids = posts.map(p => p.complaint_id).filter(Boolean)
+      let deepMap = {}
+      if (ids.length > 0) {
+        const { data: deepRows } = await supabase
+          .from('complaint_deep_analysis')
+          .select('complaint_id, root_cause, root_theme, root_detail, org_improvement, horizontal_departments, horizontal_content, action_assignee, action_deadline, action_progress')
+          .in('complaint_id', ids)
+        if (deepRows) deepRows.forEach(d => { deepMap[d.complaint_id] = d })
+      }
+
+      setBulletinPosts(posts.map(p => ({ ...p, deep: deepMap[p.complaint_id] ?? null })))
+      setBulletinLoading(false)
+    }
+    load()
   }, [])
 
   const filteredBulletinPosts = bulletinPosts.filter(post => {
@@ -123,8 +166,14 @@ export default function BulletinBoard() {
     if (bulletinCategories.length > 0 && !bulletinCategories.includes(c.root_theme)) return false
     if (bulletinKeyword.trim()) {
       const kw = bulletinKeyword.trim().toLowerCase()
-      const haystack = [c.description, c.site_name, c.direct_cause, c.root_cause, c.org_improvement]
-        .filter(Boolean).join(' ').toLowerCase()
+      const deep = post.deep || {}
+      const haystack = [
+        c.description, c.site_name, c.direct_cause,
+        deep.root_cause || c.root_cause,
+        deep.root_detail || c.root_detail,
+        deep.org_improvement || c.org_improvement,
+        deep.horizontal_content || c.horizontal_content,
+      ].filter(Boolean).join(' ').toLowerCase()
       if (!haystack.includes(kw)) return false
     }
     return true

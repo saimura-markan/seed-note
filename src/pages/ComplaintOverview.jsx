@@ -112,7 +112,9 @@ export default function ComplaintOverview() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      setUserRole(getRole(data.session?.user))
+      const role = getRole(data.session?.user)
+      console.log('[ComplaintOverview] userRole:', role, '| raw meta:', data.session?.user?.app_metadata)
+      setUserRole(role)
     })
   }, [])
 
@@ -139,6 +141,11 @@ export default function ComplaintOverview() {
     if (corr && corr[0]) setCorrection(corr[0])
     if (deep && deep[0]) setDeepAnalysis(deep[0])
     if (appr) setApprovals(appr)
+    console.log('[ComplaintOverview] fetchData:', {
+      status: c?.status,
+      correction: corr?.[0] ? '存在' : 'なし',
+      deepAnalysis: deep?.[0] ? '存在' : 'なし',
+    })
     setLoading(false)
   }, [id])
 
@@ -168,11 +175,13 @@ export default function ComplaintOverview() {
     // manager（主任クラス）
     userRole === 'manager' && ['是正案提出', '是正案差し戻し'].includes(complaint.status)
       ? { label: '是正案を確認・承認 →', path: `/complaints/${id}/deep-analysis`,  color: 'bg-blue-700 hover:bg-blue-800' } :
-    userRole === 'manager' && ['是正案承認', '改善報告書提出'].includes(complaint.status)
+    userRole === 'manager' && ['是正案承認', '改善報告書提出'].includes(complaint.status) && !deepAnalysis
       ? { label: '深掘り分析を入力 →',   path: `/complaints/${id}/deep-analysis`,  color: 'bg-blue-700 hover:bg-blue-800' } :
     // director（事業責任者）: 是正案の承認・却下
     userRole === 'director' && ['是正案提出', '是正案差し戻し'].includes(complaint.status)
       ? { label: '是正案を確認・承認 →', path: `/complaints/${id}/deep-analysis`,  color: 'bg-amber-600 hover:bg-amber-700' } :
+    userRole === 'director' && complaint.status === '深掘り提出' && !deepAnalysis
+      ? { label: '深掘り分析を入力 →',   path: `/complaints/${id}/deep-analysis`,  color: 'bg-blue-600 hover:bg-blue-700' } :
     // judgment / executive（役員）: 深掘り結果を承認
     ['judgment', 'executive'].includes(userRole) && complaint.status === '深掘り提出'
       ? { label: '役員承認へ →',         path: `/complaints/${id}/approval`,       color: 'bg-purple-700 hover:bg-purple-800' } :
@@ -413,7 +422,22 @@ export default function ComplaintOverview() {
               <div className={cn('w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold', deepAnalysis ? 'bg-emerald-500 text-white' : 'bg-stone-200 text-stone-500')}>6</div>
               <span className="text-sm font-bold text-gray-800">深掘り分析</span>
             </div>
-            <span className={cn('text-xs font-bold px-2.5 py-1 rounded-full', deepAnalysis ? 'bg-emerald-100 text-emerald-700' : 'text-stone-400')}>{deepAnalysis ? '提出済' : '未記録'}</span>
+            <div className="flex items-center gap-3">
+              <span className={cn('text-xs font-bold px-2.5 py-1 rounded-full', deepAnalysis ? 'bg-emerald-100 text-emerald-700' : 'text-stone-400')}>{deepAnalysis ? '提出済' : '未記録'}</span>
+              {deepAnalysis && correction?.created_at && deepAnalysis.updated_at && (() => {
+                const elapsed = (new Date(deepAnalysis.updated_at) - new Date(correction.created_at)) / 1000
+                const h = Math.floor(elapsed / 3600)
+                const m = Math.floor((elapsed % 3600) / 60)
+                const s = Math.floor(elapsed % 60)
+                const label = h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`
+                return (
+                  <div className="shrink-0 text-right text-emerald-700">
+                    <div className="text-[26px] font-black tabular-nums leading-none">{label}</div>
+                    <div className="text-[11px] mt-0.5">分析所要時間（提出済）</div>
+                  </div>
+                )
+              })()}
+            </div>
           </div>
           <div className="mx-5 mb-4 bg-stone-50 rounded-xl px-4 py-3">
             {deepAnalysis ? (
@@ -444,7 +468,7 @@ export default function ComplaintOverview() {
               <p className="text-sm text-gray-400">深掘り分析の提出待ちです。</p>
             )}
           </div>
-          {['director', 'executive'].includes(userRole) && correction && !deepAnalysis && (
+          {['director', 'executive', 'admin'].includes(userRole) && !deepAnalysis && (complaint.status === '改善報告書提出' || (complaint.status === '是正案承認' && correction) || complaint.status === '深掘り提出') && (
             <div className="mx-5 mb-4">
               <button onClick={() => navigate(`/complaints/${id}/deep-analysis`)}
                 className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition-colors">
@@ -465,11 +489,11 @@ export default function ComplaintOverview() {
               {approvals.length > 0 && approvedCount === approvals.length ? '承認済' : approvals.length > 0 ? `${approvedCount}/${approvals.length}名承認` : '承認待ち'}
             </span>
           </div>
-          {['executive', 'admin'].includes(userRole) && deepAnalysis && !(approvals.length > 0 && approvedCount === approvals.length) && (
+          {['executive', 'admin'].includes(userRole) && deepAnalysis && complaint.status === '深掘り提出' && !(approvals.length > 0 && approvedCount === approvals.length) && (
             <div className="mx-5 mb-3">
               <button onClick={() => navigate(`/complaints/${id}/approval`)}
                 className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold transition-colors">
-                合同改善報告書を確認する →
+                役員承認を行う →
               </button>
             </div>
           )}
@@ -485,7 +509,9 @@ export default function ComplaintOverview() {
                         {a.approver_role && <p className="text-xs text-gray-400">{a.approver_role}</p>}
                       </div>
                     </div>
-                    <span className={cn('text-xs font-bold px-2.5 py-1 rounded-full', a.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-stone-100 text-stone-500')}>{a.status === 'approved' ? '承認済' : '承認待ち'}</span>
+                    <span className={cn('text-xs font-bold px-2.5 py-1 rounded-full', a.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-stone-100 text-stone-500')}>
+                      {a.status === 'approved' ? `承認済 ${fmtDateTime(a.approved_at)}` : '承認待ち'}
+                    </span>
                   </div>
                 ))}
               </div>

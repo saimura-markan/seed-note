@@ -47,7 +47,7 @@ export default function Login({ onLogin }) {
     setResetLoading(true)
     setResetError('')
     const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-      redirectTo: 'https://seed-note-seven.vercel.app',
+      redirectTo: 'https://seed-note-seven.vercel.app/reset-password',
     })
     setResetLoading(false)
     if (error) { setResetError(error.message); return }

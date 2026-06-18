@@ -65,39 +65,47 @@ const STATUS_FILTER_GROUPS = {
 }
 const STATUS_FILTERS = Object.keys(STATUS_FILTER_GROUPS)
 
-const MINE_STATUSES = {
-  manager:   ['受付済', '対応中', '是正案提出', '是正案差し戻し', '改善報告書提出', '深掘り提出'],
-  director:  ['是正案承認'],
-  executive: ['承認完了'],
-  admin:     ['承認完了'],
+// 自分のターン判定（role → 担当ステータスのSet）
+const MY_TURN_STATUSES = {
+  manager:   new Set(['受付済', '対応中', '是正案差し戻し', '是正案承認']),
+  staff:     new Set(['受付済', '対応中', '是正案差し戻し', '是正案承認']),
+  director:  new Set(['是正案提出', '改善報告書提出']),
+  executive: new Set(['深掘り提出']),
+  admin:     new Set(['深掘り提出']),
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const MANAGER_TURN_STATUSES = new Set([
-  '受付済', '対応中', '是正案提出', '是正案差し戻し', '改善報告書提出', '深掘り提出',
-])
+// ステータスごとの期限起点と制限時間を返す
+function deadlineInfo(status, receivedAt, currentTurnStartedAt, deadlineMinutes) {
+  if (['受付済', '対応中', '是正案差し戻し'].includes(status)) {
+    return { startMs: receivedAt, limitMs: deadlineMinutes * 60 * 1000 }
+  }
+  return { startMs: currentTurnStartedAt ?? receivedAt, limitMs: 24 * 60 * 60 * 1000 }
+}
 
-function calcTurnStyle(status, turnStartedAt, deadlineMinutes) {
-  const isManagerTurn = MANAGER_TURN_STATUSES.has(status)
-  const limitMs = (isManagerTurn ? deadlineMinutes : 1440) * 60 * 1000
-  const ratio = (Date.now() - turnStartedAt) / limitMs
+function calcTurnStyle(status, receivedAt, currentTurnStartedAt, deadlineMinutes) {
+  const { startMs, limitMs } = deadlineInfo(status, receivedAt, currentTurnStartedAt, deadlineMinutes)
+  const ratio = (Date.now() - startMs) / limitMs
   if (ratio < 0.5)  return { border: 'border-l-green-400',  bg: 'bg-white' }
   if (ratio < 0.83) return { border: 'border-l-yellow-400', bg: 'bg-yellow-50' }
   if (ratio <= 1.0) return { border: 'border-l-orange-400', bg: 'bg-orange-50' }
   return { border: 'border-l-red-500', bg: 'bg-red-50' }
 }
 
-function calcTurnTimer(status, turnStartedAt, deadlineMinutes) {
-  const isManagerTurn = MANAGER_TURN_STATUSES.has(status)
-  const limitMs = (isManagerTurn ? deadlineMinutes : 1440) * 60 * 1000
-  const remaining = (limitMs - (Date.now() - turnStartedAt)) / 1000
+function calcStepTimer(status, receivedAt, currentTurnStartedAt, deadlineMinutes) {
+  const { startMs, limitMs } = deadlineInfo(status, receivedAt, currentTurnStartedAt, deadlineMinutes)
+  const remaining = (limitMs - (Date.now() - startMs)) / 1000
   if (remaining < 0) {
     const over = -remaining
     return { overdue: true, main: '超過', sub: `+${pad(over / 60)}:${pad(over % 60)} 経過` }
   }
+  const h = Math.floor(remaining / 3600)
+  const label = h > 0
+    ? `${pad(remaining / 3600)}:${pad((remaining % 3600) / 60)}:${pad(remaining % 60)}`
+    : `${pad(remaining / 60)}:${pad(remaining % 60)}`
   const color = remaining < 30 * 60 ? 'text-orange-500' : 'text-gray-700'
-  return { overdue: false, main: `${pad(remaining / 60)}:${pad(remaining % 60)}`, sub: '残り対応時間', color }
+  return { overdue: false, main: label, sub: '残り対応時間', color }
 }
 
 function mapRow(row) {
@@ -186,12 +194,16 @@ function StepProgressBar({ status }) {
   )
 }
 
-function ComplaintCard({ c, onClick, firstContactMin, mineStatuses, role }) {
-  const pc        = PRIORITY[c.priority] ?? PRIORITY[1]
-  const turnStart = c.currentTurnStartedAt ?? c.receivedAt
-  const isMyTurn  = role === 'admin' || (mineStatuses?.includes(c.status) ?? false)
-  const { border, bg } = calcTurnStyle(c.status, turnStart, c.deadlineMinutes)
-  const timer     = isMyTurn ? calcTurnTimer(c.status, turnStart, c.deadlineMinutes) : null
+function ComplaintCard({ c, onClick, firstContactMin, role }) {
+  const pc         = PRIORITY[c.priority] ?? PRIORITY[1]
+  const myTurnSet  = MY_TURN_STATUSES[role] ?? MY_TURN_STATUSES.manager
+  const isMyTurn   = myTurnSet.has(c.status)
+  const { border, bg } = isMyTurn
+    ? calcTurnStyle(c.status, c.receivedAt, c.currentTurnStartedAt, c.deadlineMinutes)
+    : { border: 'border-l-stone-200', bg: 'bg-white' }
+  const timer = c.status === '承認完了'
+    ? null
+    : isMyTurn ? calcStepTimer(c.status, c.receivedAt, c.currentTurnStartedAt, c.deadlineMinutes) : null
 
   return (
     <div
@@ -227,7 +239,9 @@ function ComplaintCard({ c, onClick, firstContactMin, mineStatuses, role }) {
 
         {/* Timer + Status */}
         <div className="shrink-0 text-right flex flex-col items-end gap-2 min-w-[110px]">
-          {timer ? (
+          {c.status === '承認完了' ? (
+            <div className="text-[22px] font-black text-emerald-600 leading-none">完了</div>
+          ) : timer ? (
             timer.overdue ? (
               <div>
                 <div className="text-[22px] font-black text-red-600 leading-none">{timer.main}</div>
@@ -254,14 +268,18 @@ function ComplaintCard({ c, onClick, firstContactMin, mineStatuses, role }) {
   )
 }
 
-function StatusComplaintCard({ c, onClick, mineStatuses, role }) {
+function StatusComplaintCard({ c, onClick, role }) {
   const stepIndex  = STATUS_TO_STEP[c.status] ?? 0
   const step       = STATUS_FLOW_STEPS[stepIndex]
   const initials   = c.assignee ? c.assignee.charAt(0) : '?'
-  const turnStart  = c.currentTurnStartedAt ?? c.receivedAt
-  const isMyTurn   = role === 'admin' || (mineStatuses?.includes(c.status) ?? false)
-  const { border, bg } = calcTurnStyle(c.status, turnStart, c.deadlineMinutes)
-  const turnTimer  = isMyTurn ? calcTurnTimer(c.status, turnStart, c.deadlineMinutes) : null
+  const myTurnSet  = MY_TURN_STATUSES[role] ?? MY_TURN_STATUSES.manager
+  const isMyTurn   = myTurnSet.has(c.status)
+  const { border, bg } = isMyTurn
+    ? calcTurnStyle(c.status, c.receivedAt, c.currentTurnStartedAt, c.deadlineMinutes)
+    : { border: 'border-l-stone-200', bg: 'bg-white' }
+  const turnTimer = c.status === '承認完了'
+    ? null
+    : isMyTurn ? calcStepTimer(c.status, c.receivedAt, c.currentTurnStartedAt, c.deadlineMinutes) : null
 
   return (
     <div
@@ -316,7 +334,6 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const { user } = useOutletContext()
   const role = getRole(user)
-  const mineStatuses = MINE_STATUSES[role] ?? []
   const [complaints, setComplaints] = useState([])
   const [firstContactMap, setFirstContactMap] = useState({})
   const [loading, setLoading] = useState(true)
@@ -521,7 +538,6 @@ export default function Dashboard() {
               c={c}
               onClick={() => navigate(`/complaints/${c.id}`)}
               firstContactMin={firstContactMap[c.id] ?? null}
-              mineStatuses={mineStatuses}
               role={role}
             />
           ))

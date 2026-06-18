@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Lock, Eye, EyeOff } from 'lucide-react'
 
-export default function ResetPassword({ onDone }) {
+export default function ResetPassword() {
+  const navigate = useNavigate()
   const [pw, setPw] = useState('')
   const [pwConfirm, setPwConfirm] = useState('')
   const [showPw, setShowPw] = useState(false)
@@ -14,23 +16,33 @@ export default function ResetPassword({ onDone }) {
   const [done, setDone] = useState(false)
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
-    const accessToken  = params.get('access_token')
-    const refreshToken = params.get('refresh_token')
-    if (!accessToken || !refreshToken) {
+    const params = new URLSearchParams(window.location.search)
+    const token_hash = params.get('token_hash')
+    const type = params.get('type')
+    const code = params.get('code')
+
+    if (token_hash && type === 'recovery') {
+      supabase.auth.verifyOtp({ token_hash, type }).then(({ error }) => {
+        if (error) {
+          setSessionError('リンクの有効期限が切れています。もう一度パスワードリセットをお試しください。')
+        } else {
+          window.history.replaceState(null, '', '/reset-password')
+        }
+        setSessionLoading(false)
+      })
+    } else if (code) {
+      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+        if (error) {
+          setSessionError('リンクの有効期限が切れています。もう一度パスワードリセットをお試しください。')
+        } else {
+          window.history.replaceState(null, '', '/reset-password')
+        }
+        setSessionLoading(false)
+      })
+    } else {
       setSessionError('無効なリンクです。パスワードリセットメールを再度お送りください。')
       setSessionLoading(false)
-      return
     }
-    // JWT issued at future エラー対策: 1秒待機してから setSession（E-Liと同じ）
-    const timer = setTimeout(async () => {
-      const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
-      if (error) {
-        setSessionError('リンクの有効期限が切れています。もう一度パスワードリセットをお試しください。')
-      }
-      setSessionLoading(false)
-    }, 1000)
-    return () => clearTimeout(timer)
   }, [])
 
   const handleSubmit = async () => {
@@ -47,7 +59,7 @@ export default function ResetPassword({ onDone }) {
       setErrors({ pw: 'パスワードの更新に失敗しました。もう一度お試しください。' })
       return
     }
-    history.replaceState(null, '', window.location.pathname)
+    await supabase.auth.signOut()
     setDone(true)
   }
 
@@ -61,7 +73,7 @@ export default function ResetPassword({ onDone }) {
             <h2 className="text-xl font-bold text-gray-800">パスワードを変更しました</h2>
             <p className="text-sm text-gray-500">新しいパスワードでログインしてください</p>
             <button
-              onClick={onDone}
+              onClick={() => navigate('/login')}
               className="w-full h-11 rounded-xl bg-[#1a4731] text-white text-sm font-bold hover:bg-[#14532d] transition-colors"
             >
               ログイン画面へ
@@ -124,7 +136,7 @@ export default function ResetPassword({ onDone }) {
             )}
 
             {sessionError ? (
-              <button onClick={onDone}
+              <button onClick={() => navigate('/login')}
                 className="w-full h-11 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50 transition-colors">
                 ← ログインに戻る
               </button>

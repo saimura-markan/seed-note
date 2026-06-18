@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import { getRole } from './lib/utils'
@@ -26,23 +26,12 @@ function RoleGuard({ user, allow, deny, children }) {
 
 export default function App() {
   const [user, setUser] = useState(undefined)
-  // E-Liと同じ方式: URLハッシュの type=recovery で即時recoveryMode開始
-  const initialRecovery = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('type') === 'recovery'
-  const [recoveryMode, setRecoveryMode] = useState(initialRecovery)
-  const recoveryRef = useRef(initialRecovery)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (!recoveryRef.current) setUser(data.session?.user ?? null)
+      setUser(data.session?.user ?? null)
     })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        recoveryRef.current = true
-        setRecoveryMode(true)
-        return
-      }
-      // recovery完了まで全イベント無視（E-Liの resetpassword 維持ロジックと同等）
-      if (recoveryRef.current) return
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
     })
     return () => subscription.unsubscribe()
@@ -56,10 +45,6 @@ export default function App() {
     )
   }
 
-  if (recoveryMode) {
-    return <ResetPassword onDone={() => { recoveryRef.current = false; setRecoveryMode(false); setUser(null) }} />
-  }
-
   return (
     <BrowserRouter>
       <Routes>
@@ -71,6 +56,7 @@ export default function App() {
           path="/register"
           element={user ? <Navigate to="/dashboard" replace /> : <Register onLogin={setUser} />}
         />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route
           path="/*"
           element={

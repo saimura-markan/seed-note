@@ -154,6 +154,12 @@ seed-note-philosophy.md
 
 ---
 
+## 外部AIレビュー（Gemini等）を行う場合
+
+外部AIレビューを行う場合は、必ず `docs/AI-REVIEW-SECURITY-RULES.md` を参照し、送信禁止情報が含まれていないことを確認してから実行すること。
+
+---
+
 ## 禁止事項
 
 以下は禁止とする。

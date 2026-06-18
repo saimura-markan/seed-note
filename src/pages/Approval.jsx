@@ -293,7 +293,7 @@ export default function Approval() {
                   ? `${contactLogs[0].content}（${fmtDateTime(contactLogs[0].created_at)}）`
                   : '記録なし'}</p>
                 <p>・作業者聞き取り：{hearingText || '記録なし'}</p>
-                <p>・是正案：{correction?.correction || '—'}</p>
+                <p>・対応案：{correction?.correction || '—'}</p>
               </div>
             </div>
 

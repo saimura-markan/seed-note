@@ -197,7 +197,7 @@ export default function ComplaintOverview() {
           <span>現場作業者：<strong className="text-gray-700">{complaint.worker_name || '—'}</strong></span>
           <span>作業日：<strong className="text-gray-700">{complaint.work_date || '—'}</strong></span>
           <span>受付：{fmtDateTime(complaint.received_at)}</span>
-          <span>ステータス：<strong className="text-gray-700">{complaint.status}</strong></span>
+          <span>ステータス：<strong className="text-gray-700">{complaint.status.replace('是正案', '対応案')}</strong></span>
         </div>
         {complaint.content && (
           <div className="mt-3 pt-3 border-t border-stone-100">
@@ -285,12 +285,12 @@ export default function ComplaintOverview() {
           </div>
         </div>
 
-        {/* ③ 是正案 */}
+        {/* ③ 対応案 */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 border-l-violet-400">
           <div className="px-5 py-3.5 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className={cn('w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold', reportLog ? 'bg-emerald-500 text-white' : 'bg-stone-200 text-stone-500')}>3</div>
-              <span className="text-sm font-bold text-gray-800">是正案</span>
+              <span className="text-sm font-bold text-gray-800">対応案</span>
             </div>
             <span className={cn('text-xs font-bold px-2.5 py-1 rounded-full', reportLog ? 'bg-emerald-100 text-emerald-700' : 'text-stone-400')}>{reportLog ? '提出済' : '提出待ち'}</span>
           </div>
@@ -298,9 +298,17 @@ export default function ComplaintOverview() {
             {reportLog ? (
               <p className="text-sm text-gray-700">{reportLog.content}</p>
             ) : (
-              <p className="text-sm text-gray-400">是正案の提出待ちです。</p>
+              <p className="text-sm text-gray-400">対応案の提出待ちです。</p>
             )}
           </div>
+          {!reportLog && !correction && ['manager', 'admin'].includes(userRole) && ['受付済', '対応中'].includes(complaint.status) && (
+            <div className="mx-5 mb-4">
+              <button onClick={() => navigate(`/complaints/${id}/correction`)}
+                className="w-full py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold transition-colors">
+                対応案を作成・提出 →
+              </button>
+            </div>
+          )}
         </div>
 
         {/* ④ 事業責任者確認 */}
@@ -339,11 +347,11 @@ export default function ComplaintOverview() {
               <p className="text-sm text-gray-400">事業責任者の確認待ちです。</p>
             )}
           </div>
-          {userRole === 'director' && ['是正案提出', '是正案差し戻し'].includes(complaint.status) && (
+          {userRole === 'director' && complaint.status === '是正案提出' && (
             <div className="mx-5 mb-4">
               <button onClick={() => navigate(`/complaints/${id}/deep-analysis`)}
                 className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold transition-colors">
-                是正案を確認・承認 →
+                対応案を確認・承認 →
               </button>
             </div>
           )}
@@ -351,7 +359,7 @@ export default function ComplaintOverview() {
             <div className="mx-5 mb-4">
               <button onClick={() => navigate(`/complaints/${id}/correction`)}
                 className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold transition-colors">
-                是正案を修正・再提出 →
+                対応案を修正・再提出 →
               </button>
             </div>
           )}

@@ -22,7 +22,7 @@ const STATUS_TO_STEP = {
 const STATUS_FLOW_STEPS = [
   { label: '受付',    dotColor: 'bg-orange-500', textColor: 'text-orange-500', borderColor: 'border-l-orange-500' },
   { label: '対応中',  dotColor: 'bg-amber-500',  textColor: 'text-amber-500',  borderColor: 'border-l-amber-500' },
-  { label: '是正案',  dotColor: 'bg-blue-500',   textColor: 'text-blue-500',   borderColor: 'border-l-blue-500' },
+  { label: '対応案',  dotColor: 'bg-blue-500',   textColor: 'text-blue-500',   borderColor: 'border-l-blue-500' },
   { label: '改善報告', dotColor: 'bg-indigo-500', textColor: 'text-indigo-500', borderColor: 'border-l-indigo-500' },
   { label: '深掘り',  dotColor: 'bg-purple-500', textColor: 'text-purple-500', borderColor: 'border-l-purple-500' },
   { label: '承認',    dotColor: 'bg-emerald-500', textColor: 'text-emerald-500', borderColor: 'border-l-emerald-500' },
@@ -257,7 +257,7 @@ function ComplaintCard({ c, onClick, firstContactMin, role }) {
             <div className="h-9" />
           )}
           <span className={cn('text-xs font-semibold px-3 py-1 rounded-full', STATUS_BADGE[c.status] ?? 'bg-stone-100 text-stone-600')}>
-            {c.status}
+            {c.status.replace('是正案', '対応案')}
           </span>
           {firstContactMin != null && (
             <span className="text-xs text-gray-500">初回連絡: {firstContactMin}分</span>
@@ -303,7 +303,7 @@ function StatusComplaintCard({ c, onClick, role }) {
           </div>
         </div>
         <span className={cn('text-xs font-semibold px-3 py-1 rounded-full shrink-0', STATUS_BADGE[c.status] ?? 'bg-stone-100 text-stone-600 border border-stone-200')}>
-          {c.status}
+          {c.status.replace('是正案', '対応案')}
         </span>
       </div>
 

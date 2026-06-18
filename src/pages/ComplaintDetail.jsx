@@ -501,7 +501,7 @@ export default function ComplaintDetail() {
       {/* ④ 差し戻しセクション */}
       {complaint.status === '是正案差し戻し' && (
         <div className="bg-red-50 border border-red-200 rounded-2xl p-5 mb-4">
-          <p className="text-sm font-bold text-red-700 mb-3">⚠️ 是正案が差し戻されました</p>
+          <p className="text-sm font-bold text-red-700 mb-3">⚠️ 対応案が差し戻されました</p>
           {complaint.supervisor_comment && (
             <div className="bg-white rounded-xl px-4 py-3 text-sm text-gray-700 mb-4 border border-red-100">
               <p className="text-xs font-semibold text-red-600 mb-1">事業責任者のコメント</p>
@@ -510,7 +510,7 @@ export default function ComplaintDetail() {
           )}
           <button onClick={() => navigate(`/complaints/${id}/correction`)}
             className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm transition-colors">
-            是正案を修正して再提出
+            対応案を修正して再提出
           </button>
         </div>
       )}
@@ -519,11 +519,11 @@ export default function ComplaintDetail() {
       {complaint.status === '是正案承認' && (
         <div className="bg-green-50 border border-green-200 rounded-2xl p-5 mb-4">
           <p className="text-sm text-green-800 leading-relaxed mb-4">
-            ✅ 是正案が承認されました。現場での是正処置が完了したら、是正報告書を作成してください。
+            ✅ 対応案が承認されました。現場での是正処置が完了したら、改善報告書を作成してください。
           </p>
           <button onClick={() => navigate(`/complaints/${id}/correction`)}
             className="w-full py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm transition-colors shadow-sm">
-            是正報告書を作成する →
+            改善報告書を作成する →
           </button>
         </div>
       )}

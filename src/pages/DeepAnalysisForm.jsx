@@ -151,7 +151,7 @@ export default function DeepAnalysisForm() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  // ── 是正案 承認 ──
+  // ── 対応案 承認 ──
   const handleApprove = async () => {
     setApproving(true)
     const now = new Date().toISOString()
@@ -179,7 +179,7 @@ export default function DeepAnalysisForm() {
     await fetchData()
   }
 
-  // ── 是正案 否認 ──
+  // ── 対応案 否認 ──
   const handleReject = async () => {
     if (!supervisorComment.trim()) { alert('差し戻しコメントを入力してください'); return }
     setApproving(true)
@@ -249,13 +249,13 @@ export default function DeepAnalysisForm() {
     await supabase.from('complaint_logs').insert({ complaint_id: id, type: 'deep_rejected', content: deepRejectReason.trim() })
     await supabase.from('complaint_approvals').delete().eq('complaint_id', id)
     if (existing) await supabase.from('complaint_deep_analysis').delete().eq('id', existing.id)
-    const { error } = await supabase.from('complaints').update({ status: '改善報告書提出', current_turn_started_at: new Date().toISOString() }).eq('id', id)
+    const { error } = await supabase.from('complaints').update({ status: 'correction_rejected', current_turn_started_at: new Date().toISOString() }).eq('id', id)
     setDeepActing(false)
     if (error) { alert(`差し戻しに失敗しました: ${error.message}`); return }
     navigate(`/complaints/${id}`)
   }
 
-  // ── 是正案承認済み コメント追加 ──
+  // ── 対応案承認済み コメント追加 ──
   const handleSupervisorComment = async () => {
     if (!newComment.trim()) return
     setSendingComment(true)
@@ -339,7 +339,7 @@ export default function DeepAnalysisForm() {
       {!(isApprovalPhase && complaint.judgment === '手直し') && (
         <div className="bg-white rounded-2xl shadow-sm p-5 mb-5">
           <p className="text-lg font-bold text-gray-900 mb-0.5">
-            {isApprovalPhase ? '✅ 是正案の確認・承認'
+            {isApprovalPhase ? '✅ 対応案の確認・承認'
               : (complaint.status === '改善報告書提出' || (complaint.status === '是正案承認' && correction)) ? '📋 改善報告書（現象原因の特定）の確認・深掘り分析'
               : complaint.status === '深掘り提出' ? '🔍 深掘り分析の確認'
               : '🔍 深掘り・学習'}
@@ -348,7 +348,7 @@ export default function DeepAnalysisForm() {
         </div>
       )}
 
-      {/* ── 是正案承認フェーズ ── */}
+      {/* ── 対応案承認フェーズ ── */}
       {isApprovalPhase && (
         <>
           {complaint.judgment !== '手直し' && (
@@ -362,7 +362,7 @@ export default function DeepAnalysisForm() {
 
               <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
                 <div className="px-5 py-3.5 border-b border-stone-100 bg-stone-50">
-                  <span className="text-sm font-bold text-gray-700">① 管理者の是正案</span>
+                  <span className="text-sm font-bold text-gray-700">① 管理者の対応案</span>
                 </div>
                 <div className="p-5">
                   <div className="mb-3">
@@ -411,7 +411,7 @@ export default function DeepAnalysisForm() {
           <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
             <div className="px-5 py-3.5 border-b border-stone-100">
               <span className="text-sm font-bold text-gray-800">
-                {complaint.judgment === '手直し' ? '事業責任者コメント' : '② 是正案の承認・否認'}
+                {complaint.judgment === '手直し' ? '事業責任者コメント' : '② 対応案の確認・承認'}
               </span>
             </div>
             <div className="p-5 space-y-3">
@@ -451,10 +451,10 @@ export default function DeepAnalysisForm() {
         </>
       )}
 
-      {/* ── 是正案差し戻し済み ── */}
+      {/* ── 対応案差し戻し済み ── */}
       {complaint.status === '是正案差し戻し' && (
         <div className="bg-orange-50 border border-orange-200 rounded-2xl px-5 py-4 mb-4">
-          <p className="text-sm font-bold text-orange-800">⚠️ 是正案を差し戻し済みです</p>
+          <p className="text-sm font-bold text-orange-800">⚠️ 対応案を差し戻し済みです</p>
           <p className="text-sm text-orange-700 mt-1">管理者の修正・再提出をお待ちください。</p>
           {complaint.supervisor_comment && (
             <div className="mt-3 bg-white rounded-xl px-4 py-3 text-sm text-gray-700 border border-orange-100">
@@ -465,11 +465,11 @@ export default function DeepAnalysisForm() {
         </div>
       )}
 
-      {/* ── 是正案承認済み：コメントセクション（改善報告書未提出の場合のみ） ── */}
+      {/* ── 対応案承認済み：コメントセクション（改善報告書未提出の場合のみ） ── */}
       {complaint.status === '是正案承認' && !correction && (
         <>
           <div className="bg-green-50 border border-green-200 rounded-2xl px-5 py-4 mb-4 flex items-center gap-2">
-            <span className="text-green-700 font-bold text-sm">✅ 是正案を承認済み</span>
+            <span className="text-green-700 font-bold text-sm">✅ 対応案を承認済み</span>
             {complaint.supervisor_comment && (
               <span className="text-xs text-green-600">— {complaint.supervisor_comment}</span>
             )}
@@ -847,7 +847,7 @@ export default function DeepAnalysisForm() {
                     ? `${contactLogs[0].content}（${fmtDateTime(contactLogs[0].created_at)}）`
                     : '記録なし'}</p>
                   <p>・作業者聞き取り：{hearingText || '記録なし'}</p>
-                  <p>・是正案：{correction?.correction || '—'}</p>
+                  <p>・対応案：{correction?.correction || '—'}</p>
                 </div>
               </div>
 

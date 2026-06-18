@@ -107,6 +107,8 @@ export default function DeepAnalysisForm() {
   const [showDeepReject, setShowDeepReject] = useState(false)
   const [deepRejectReason, setDeepRejectReason] = useState('')
   const [deepActing, setDeepActing] = useState(false)
+  const [deepEditMode, setDeepEditMode] = useState(false)
+  const [deepSent, setDeepSent] = useState(false)
 
   // 是正案再提出（manager の返答）
   const [latestCorrectionReply, setLatestCorrectionReply] = useState(null)
@@ -236,6 +238,7 @@ export default function DeepAnalysisForm() {
     }
     await supabase.from('complaints').update({ status: '深掘り提出', current_turn_started_at: new Date().toISOString() }).eq('id', id)
     setSubmitting(false)
+    setDeepEditMode(false)
     await fetchData()
   }
 
@@ -244,7 +247,7 @@ export default function DeepAnalysisForm() {
     setDeepActing(true)
     await supabase.from('complaint_logs').insert({ complaint_id: id, type: 'deep_approved', content: '合同改善報告書を役員に提出しました' })
     setDeepActing(false)
-    navigate(`/complaints/${id}`)
+    setDeepSent(true)
   }
 
   // ── 深掘り分析 否認（差し戻し） ──
@@ -518,7 +521,7 @@ export default function DeepAnalysisForm() {
       )}
 
       {/* ── 改善報告書提出フェーズ ── */}
-      {(complaint.status === '改善報告書提出' || (complaint.status === '是正案承認' && correction) || (complaint.status === '深掘り提出' && !existing)) && (
+      {(complaint.status === '改善報告書提出' || (complaint.status === '是正案承認' && correction) || (complaint.status === '深掘り提出' && !existing) || deepEditMode) && (
         <>
           {/* 改善報告書の内容 */}
           {correction && (
@@ -831,7 +834,7 @@ export default function DeepAnalysisForm() {
       )}
 
       {/* ── 深掘り提出済み：合同改善報告書プレビュー ── */}
-      {complaint.status === '深掘り提出' && existing && (
+      {complaint.status === '深掘り提出' && existing && !deepEditMode && (
         <>
           {/* プレビュー */}
           <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
@@ -910,13 +913,22 @@ export default function DeepAnalysisForm() {
               <span className="text-sm font-bold text-gray-800">役員への報告確認</span>
             </div>
             <div className="p-5 space-y-4">
-              {!showDeepReject ? (
+              {deepSent ? (
+                <div className="flex flex-col items-center gap-3 py-4">
+                  <p className="text-2xl">✅</p>
+                  <p className="text-base font-bold text-emerald-700">役員へ提出しました。</p>
+                  <button type="button" onClick={() => navigate(`/complaints/${id}`)}
+                    className="mt-2 px-6 py-2.5 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50 transition-colors">
+                    クレーム詳細に戻る
+                  </button>
+                </div>
+              ) : !showDeepReject ? (
                 <>
                   <p className="text-sm text-gray-700 leading-relaxed">
                     この内容を合同改善報告書として役員に報告しますか？
                   </p>
                   <div className="flex gap-3">
-                    <button type="button" onClick={() => setShowDeepReject(true)}
+                    <button type="button" onClick={() => setDeepEditMode(true)}
                       className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm transition-colors">
                       いいえ（再度修正）
                     </button>

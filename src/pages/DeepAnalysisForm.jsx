@@ -242,6 +242,19 @@ export default function DeepAnalysisForm() {
     navigate(`/complaints/${id}`)
   }
 
+  // ── 深掘り分析 否認（差し戻し） ──
+  const handleDeepReject = async () => {
+    if (!deepRejectReason.trim()) return
+    setDeepActing(true)
+    await supabase.from('complaint_logs').insert({ complaint_id: id, type: 'deep_rejected', content: deepRejectReason.trim() })
+    await supabase.from('complaint_approvals').delete().eq('complaint_id', id)
+    if (existing) await supabase.from('complaint_deep_analysis').delete().eq('id', existing.id)
+    const { error } = await supabase.from('complaints').update({ status: '改善報告書提出', current_turn_started_at: new Date().toISOString() }).eq('id', id)
+    setDeepActing(false)
+    if (error) { alert(`差し戻しに失敗しました: ${error.message}`); return }
+    navigate(`/complaints/${id}`)
+  }
+
   // ── 是正案承認済み コメント追加 ──
   const handleSupervisorComment = async () => {
     if (!newComment.trim()) return
@@ -870,19 +883,40 @@ export default function DeepAnalysisForm() {
               <span className="text-sm font-bold text-gray-800">役員への報告確認</span>
             </div>
             <div className="p-5 space-y-4">
-              <p className="text-sm text-gray-700 leading-relaxed">
-                この内容を合同改善報告書として役員に報告しますか？
-              </p>
-              <div className="flex gap-3">
-                <button type="button" onClick={() => navigate(`/complaints/${id}`)}
-                  className="flex-1 py-3 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50 transition-colors">
-                  いいえ・戻る
-                </button>
-                <button type="button" onClick={handleDeepApprove} disabled={deepActing}
-                  className="flex-1 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm disabled:opacity-40 transition-colors">
-                  {deepActing ? '処理中...' : 'はい・役員承認へ →'}
-                </button>
-              </div>
+              {!showDeepReject ? (
+                <>
+                  <p className="text-sm text-gray-700 leading-relaxed">
+                    この内容を合同改善報告書として役員に報告しますか？
+                  </p>
+                  <div className="flex gap-3">
+                    <button type="button" onClick={() => setShowDeepReject(true)}
+                      className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm transition-colors">
+                      否認（差し戻し）
+                    </button>
+                    <button type="button" onClick={handleDeepApprove} disabled={deepActing}
+                      className="flex-1 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm disabled:opacity-40 transition-colors">
+                      {deepActing ? '処理中...' : 'はい・役員承認へ →'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold text-red-700">差し戻しの理由を入力してください（必須）</p>
+                  <textarea value={deepRejectReason} onChange={e => setDeepRejectReason(e.target.value)}
+                    rows={3} placeholder="深掘り分析を再入力するよう指示してください" className={taCls} />
+                  <div className="flex gap-3">
+                    <button type="button" onClick={() => setShowDeepReject(false)}
+                      className="flex-1 py-2.5 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50 transition-colors">
+                      キャンセル
+                    </button>
+                    <button type="button" onClick={handleDeepReject}
+                      disabled={deepActing || !deepRejectReason.trim()}
+                      className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold disabled:opacity-40 transition-colors">
+                      {deepActing ? '処理中...' : '否認して戻る'}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </>

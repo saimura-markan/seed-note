@@ -100,10 +100,10 @@ function deadlineInfo(status, receivedAt, currentTurnStartedAt, deadlineMinutes)
 function calcTurnStyle(status, receivedAt, currentTurnStartedAt, deadlineMinutes) {
   const { startMs, limitMs } = deadlineInfo(status, receivedAt, currentTurnStartedAt, deadlineMinutes)
   const ratio = (Date.now() - startMs) / limitMs
-  if (ratio < 0.5)  return { border: 'border-l-green-400',  bg: 'bg-white' }
-  if (ratio < 0.83) return { border: 'border-l-yellow-400', bg: 'bg-yellow-50' }
-  if (ratio <= 1.0) return { border: 'border-l-orange-400', bg: 'bg-orange-50' }
-  return { border: 'border-l-red-500', bg: 'bg-red-50' }
+  if (ratio < 0.5)  return { border: 'border-l-green-400',  bg: 'bg-red-50',  overdue: false }
+  if (ratio < 0.83) return { border: 'border-l-yellow-500', bg: 'bg-yellow-50', overdue: false }
+  if (ratio <= 1.0) return { border: 'border-l-orange-500', bg: 'bg-orange-50', overdue: false }
+  return { border: 'border-l-red-600', bg: 'bg-red-100', overdue: true }
 }
 
 function calcStepTimer(status, receivedAt, currentTurnStartedAt, deadlineMinutes) {
@@ -211,9 +211,9 @@ function ComplaintCard({ c, onClick, firstContactMin, role }) {
   const pc         = PRIORITY[c.priority] ?? PRIORITY[1]
   const myTurnSet  = MY_TURN_STATUSES[role] ?? MY_TURN_STATUSES.manager
   const isMyTurn   = myTurnSet.has(c.status)
-  const { border, bg } = isMyTurn
+  const { border, bg, overdue: turnOverdue } = isMyTurn
     ? calcTurnStyle(c.status, c.receivedAt, c.currentTurnStartedAt, c.deadlineMinutes)
-    : { border: 'border-l-stone-200', bg: 'bg-white' }
+    : { border: 'border-l-stone-200', bg: 'bg-white', overdue: false }
   const timer = c.status === '承認完了'
     ? null
     : isMyTurn ? calcStepTimer(c.status, c.receivedAt, c.currentTurnStartedAt, c.deadlineMinutes) : null
@@ -222,10 +222,16 @@ function ComplaintCard({ c, onClick, firstContactMin, role }) {
     <div
       onClick={onClick}
       className={cn(
-        'rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-all border-l-[5px] p-4 pl-5',
+        'rounded-2xl cursor-pointer transition-all border-l-[5px] p-4 pl-5',
+        turnOverdue ? 'shadow-md shadow-red-200 hover:shadow-lg hover:shadow-red-300' : 'shadow-sm hover:shadow-md',
         bg, border
       )}
     >
+      {turnOverdue && (
+        <div className="mb-3 -mt-1 bg-red-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 animate-pulse">
+          🔥 期限超過！即対応必須！
+        </div>
+      )}
       <div className="flex items-start gap-4">
         {/* Priority */}
         <div className={cn('w-[52px] shrink-0 rounded-xl flex flex-col items-center justify-center py-2.5 gap-0.5', pc.bg)}>
@@ -256,9 +262,9 @@ function ComplaintCard({ c, onClick, firstContactMin, role }) {
             <div className="text-[22px] font-black text-emerald-600 leading-none">完了</div>
           ) : timer ? (
             timer.overdue ? (
-              <div>
+              <div className="text-right animate-pulse">
                 <div className="text-[22px] font-black text-red-600 leading-none">{timer.main}</div>
-                <div className="text-sm text-red-500 font-semibold mt-0.5">{timer.sub}</div>
+                <div className="text-sm text-red-600 font-bold mt-0.5">{timer.sub}</div>
               </div>
             ) : (
               <div>
@@ -468,10 +474,10 @@ export default function Dashboard() {
   return (
     <div className="px-6 py-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <h1 className="text-base font-bold text-gray-700">クレーム管理ダッシュボード</h1>
           {actionableCount > 0 && (
-            <span className="bg-red-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full min-w-[1.4rem] text-center leading-tight">
+            <span className="animate-pulse bg-red-500 text-white text-sm font-black px-3 py-1 rounded-full min-w-[2rem] text-center shadow-lg shadow-red-200 leading-tight">
               {actionableCount}
             </span>
           )}
@@ -484,6 +490,16 @@ export default function Dashboard() {
           新規依頼
         </button>
       </div>
+
+      {/* 未対応警告バナー */}
+      {actionableCount > 0 && (
+        <div className="bg-red-50 border-2 border-red-300 rounded-2xl px-5 py-3 mb-5 flex items-center gap-3">
+          <span className="text-xl animate-pulse shrink-0">⚠️</span>
+          <p className="text-sm font-bold text-red-700">
+            未対応のクレームが{actionableCount}件あります！早急に対応してください！
+          </p>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">

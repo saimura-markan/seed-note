@@ -84,7 +84,7 @@ export default function Layout({ user, onLogout }) {
         </div>
       </header>
       <main>
-        <Outlet context={{ user }} />
+        <Outlet context={{ user, profileName }} />
       </main>
     </div>
   )

@@ -50,7 +50,7 @@ const labelCls = 'block text-xs font-semibold text-gray-600 mb-1.5'
 
 export default function ComplaintNew() {
   const navigate = useNavigate()
-  const { user } = useOutletContext()
+  const { user, profileName } = useOutletContext()
   const [form, setForm]       = useState(INITIAL_FORM)
   const [submitting, setSubmitting] = useState(false)
   const [receivedAt]          = useState(() => new Date())
@@ -62,11 +62,11 @@ export default function ComplaintNew() {
     return () => clearInterval(t)
   }, [])
 
-  // ログイン中ユーザーのfull_nameを受付者名に自動入力
+  // ログイン中ユーザーの名前を受付者名に自動入力（profilesテーブル優先）
   useEffect(() => {
-    const name = user?.user_metadata?.full_name
+    const name = profileName || user?.user_metadata?.full_name
     if (name) set('receiverName', name)
-  }, [user])
+  }, [profileName, user])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const handleClear = () => setForm(INITIAL_FORM)

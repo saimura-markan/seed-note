@@ -25,20 +25,18 @@ const LEVEL_COLOR = {
   5: { active: '#dc2626', light: '#fef2f2', border: '#fecaca', label: 'text-red-700' },
 }
 
-// 部署 → デフォルト担当者（手動変更可）
-const DEPARTMENTS = {
-  '清掃部 清掃１課':  '井上参事',
-  '清掃部 清掃２課':  '備主任',
-  '工事部 解体課':    '松木主任',
-  '工事部 産廃課':    '新田主任',
-  '環境リサイクル部': '岡橋次長',
-  '本部':            '榮藤取締役',
+// 部署 → 管理者・事業責任者（手動変更可、将来はアカウント紐付け予定）
+const DEPT_STAFF = {
+  '工事部':           { manager: '松木主任', director: '小笠原常務（兼任）' },
+  '清掃部':           { manager: '備主任',   director: '川畑次長' },
+  '環境リサイクル部':  { manager: '青柳',     director: '岡橋次長' },
+  '本部':             { manager: '中田主任', director: '榮藤取締役' },
 }
 
 const INITIAL_FORM = {
   clientName: '', clientContact: '', siteName: '',
   workerName: '', category: '', content: '',
-  emotionLevel: 3, department: '', assignee: '', receiverName: '', workDate: '',
+  emotionLevel: 3, department: '', assignee: '', director: '', receiverName: '', workDate: '',
 }
 
 // ─── スタイル定数 ─────────────────────────────────────────────────────────────
@@ -318,29 +316,41 @@ export default function ComplaintNew() {
           {/* 担当 */}
           <div className="bg-white rounded-2xl p-5 shadow-sm space-y-4">
             <p className="text-sm font-bold text-gray-800">担当</p>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className={labelCls}>担当部署</label>
                 <select value={form.department}
                   onChange={e => {
                     const dept = e.target.value
-                    set('department', dept)
-                    set('assignee', DEPARTMENTS[dept] || '')
+                    const staff = DEPT_STAFF[dept] ?? {}
+                    setForm(f => ({ ...f, department: dept, assignee: staff.manager || '', director: staff.director || '' }))
                   }}
                   className={inputCls + ' bg-white'}>
                   <option value="">選択してください</option>
-                  {Object.keys(DEPARTMENTS).map(d => <option key={d} value={d}>{d}</option>)}
+                  {Object.keys(DEPT_STAFF).map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
               </div>
               <div>
                 <label className={labelCls}>
-                  担当者
+                  管理者（担当者）
                   {form.department && (
                     <span className="ml-1.5 text-[10px] font-normal text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">自動入力・変更可</span>
                   )}
                 </label>
                 <input value={form.assignee} onChange={e => set('assignee', e.target.value)}
-                  className={inputCls} placeholder="部署を選択すると自動入力されます" />
+                  className={cn(inputCls, form.department && form.assignee ? 'border-emerald-200 bg-emerald-50' : '')}
+                  placeholder="部署を選択すると自動入力" />
+              </div>
+              <div>
+                <label className={labelCls}>
+                  事業責任者
+                  {form.department && (
+                    <span className="ml-1.5 text-[10px] font-normal text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">自動入力・変更可</span>
+                  )}
+                </label>
+                <input value={form.director} onChange={e => set('director', e.target.value)}
+                  className={cn(inputCls, form.department && form.director ? 'border-emerald-200 bg-emerald-50' : '')}
+                  placeholder="部署を選択すると自動入力" />
               </div>
             </div>
             <div>

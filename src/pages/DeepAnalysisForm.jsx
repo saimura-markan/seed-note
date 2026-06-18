@@ -647,7 +647,7 @@ export default function DeepAnalysisForm() {
                   {rootPhase !== 'q1' && rootAnswers.q1 && (
                     <div>
                       <p className="text-sm font-bold text-gray-800 mb-2">
-                        それはなぜ会社の仕組みとして防げなかったのでしょうか？
+                        ではその真因をどのような仕組みにすれば改善可能ですか？
                       </p>
                       {rootPhase === 'q2' ? (
                         <div className="space-y-2">

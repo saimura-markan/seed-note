@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { Sprout, CalendarDays, Clock, BarChart2 } from 'lucide-react'
 import { cn, getRole } from '@/lib/utils'
@@ -68,6 +68,15 @@ const STATUS_FILTER_GROUPS = {
   '完了':     ['承認完了'],
 }
 const STATUS_FILTERS = Object.keys(STATUS_FILTER_GROUPS)
+
+// 要対応ステータス（role → 通知バッジの対象）
+const ACTIONABLE_STATUSES = {
+  admin:     ['受付済', '対応中', '是正案差し戻し', '是正案承認', '深掘り提出', '役員差し戻し'],
+  manager:   ['受付済', '対応中', '是正案差し戻し', '是正案承認', '深掘り提出', '役員差し戻し'],
+  director:  ['是正案提出', '是正案再提出'],
+  executive: ['深掘り提出'],
+  judgment:  ['深掘り提出'],
+}
 
 // 自分のターン判定（role → 担当ステータスのSet）
 const MY_TURN_STATUSES = {
@@ -394,6 +403,17 @@ export default function Dashboard() {
       .then(({ data }) => { if (data?.department) setUserDepartment(data.department) })
   }, [user?.id])
 
+  const actionableSet = useMemo(() => new Set(ACTIONABLE_STATUSES[role] ?? []), [role])
+  const actionableCount = useMemo(
+    () => complaints.filter(c => actionableSet.has(c.status)).length,
+    [complaints, actionableSet]
+  )
+  const getActionableCount = (filterKey) => {
+    const statuses = STATUS_FILTER_GROUPS[filterKey]
+    if (!statuses) return actionableCount
+    return complaints.filter(c => statuses.includes(c.status) && actionableSet.has(c.status)).length
+  }
+
   const today = new Date().toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' })
 
   const overdue = complaints.filter(c => calcTimer(c.receivedAt, c.deadlineMinutes).overdue)
@@ -448,7 +468,14 @@ export default function Dashboard() {
   return (
     <div className="px-6 py-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-5">
-        <h1 className="text-base font-bold text-gray-700">クレーム管理ダッシュボード</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-base font-bold text-gray-700">クレーム管理ダッシュボード</h1>
+          {actionableCount > 0 && (
+            <span className="bg-red-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full min-w-[1.4rem] text-center leading-tight">
+              {actionableCount}
+            </span>
+          )}
+        </div>
         <button
           onClick={() => navigate('/complaints/new')}
           className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold px-4 py-2 rounded-xl shadow-sm transition-colors"
@@ -511,6 +538,7 @@ export default function Dashboard() {
         {STATUS_FILTERS.map(f => {
           const count = getCount(f)
           const active = statusFilter === f
+          const ac = getActionableCount(f)
           return (
             <button
               key={f}
@@ -526,6 +554,11 @@ export default function Dashboard() {
               <span className={cn('text-xs font-bold', active ? 'text-emerald-200' : 'text-gray-400')}>
                 {count}
               </span>
+              {ac > 0 && (
+                <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.1rem] text-center leading-tight -ml-0.5">
+                  {ac}
+                </span>
+              )}
             </button>
           )
         })}

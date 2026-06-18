@@ -473,8 +473,8 @@ export default function ComplaintOverview() {
           )
         })()}
 
-        {/* ④A 対応案の修正・返答 */}
-        {complaint.status === '是正案差し戻し' && ['manager', 'admin'].includes(userRole) && (
+        {/* ④A 対応案の修正・返答 - 是正案差し戻し時のみ（⑤が解放されたら非表示） */}
+        {complaint.status === '是正案差し戻し' && step5Locked && ['manager', 'admin'].includes(userRole) && (
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 border-l-red-400">
             <div className="px-5 py-3.5 flex items-center justify-between">
               <div className="flex items-center gap-2">

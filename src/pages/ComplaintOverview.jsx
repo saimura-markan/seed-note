@@ -10,7 +10,7 @@ function statusToStep(status) {
   const map = {
     '受付済': 0,
     '対応中': 1,
-    '是正案提出': 2, '是正案差し戻し': 2, '是正案承認': 2,
+    '是正案提出': 2, '是正案差し戻し': 2, '是正案再提出': 2, '是正案承認': 2,
     '改善報告書提出': 3, 'correction_rejected': 3,
     '深掘り提出': 5,
     '承認完了': 6,
@@ -107,6 +107,9 @@ export default function ComplaintOverview() {
   const [supervisorCommentLogs, setSupervisorCommentLogs] = useState([])
   const [deepAnalysis,        setDeepAnalysis]        = useState(null)
   const [approvals,    setApprovals]    = useState([])
+  const [latestCorrectionReply, setLatestCorrectionReply] = useState(null)
+  const [replyText,    setReplyText]    = useState('')
+  const [replySending, setReplySending] = useState(false)
   const [userRole,     setUserRole]     = useState(null)
   const [loading,      setLoading]      = useState(true)
 
@@ -137,6 +140,8 @@ export default function ComplaintOverview() {
       setHasHearing(hLogs.length > 0)
       if (rLog) setReportLog(rLog)
       setSupervisorCommentLogs(logs.filter(l => l.type === 'supervisor_comment'))
+      const replyLog = logs.filter(l => l.type === 'correction_reply').pop()
+      if (replyLog) setLatestCorrectionReply(replyLog)
     }
     if (corr && corr[0]) setCorrection(corr[0])
     if (deep && deep[0]) setDeepAnalysis(deep[0])
@@ -150,6 +155,20 @@ export default function ComplaintOverview() {
   }, [id])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  const handleSendReply = async () => {
+    if (!replyText.trim()) return
+    setReplySending(true)
+    await supabase.from('complaint_logs').insert({
+      complaint_id: id, type: 'correction_reply', content: replyText.trim()
+    })
+    await supabase.from('complaints').update({
+      status: '是正案再提出', current_turn_started_at: new Date().toISOString()
+    }).eq('id', id)
+    setReplySending(false)
+    setReplyText('')
+    fetchData()
+  }
 
   if (loading) return (
     <div className="flex items-center justify-center py-32 text-gray-400">
@@ -355,17 +374,74 @@ export default function ComplaintOverview() {
               </button>
             </div>
           )}
-          {userRole === 'manager' && complaint.status === '是正案差し戻し' && (
+          {userRole === 'director' && complaint.status === '是正案再提出' && (
             <div className="mx-5 mb-4">
-              <button onClick={() => navigate(`/complaints/${id}/correction`)}
-                className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold transition-colors">
-                対応案を修正・再提出 →
+              <button onClick={() => navigate(`/complaints/${id}/deep-analysis`)}
+                className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold transition-colors">
+                再提出内容を確認・承認 →
               </button>
             </div>
           )}
         </div>
           )
         })()}
+
+        {/* ④A 対応案の修正・返答 */}
+        {complaint.status === '是正案差し戻し' && ['manager', 'admin'].includes(userRole) && (
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 border-l-red-400">
+            <div className="px-5 py-3.5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold bg-red-400 text-white">↩</div>
+                <span className="text-sm font-bold text-gray-800">④A 対応案の修正・返答</span>
+              </div>
+              <span className="text-xs font-bold px-2.5 py-1 rounded-full text-stone-400">返答待ち</span>
+            </div>
+            <div className="mx-5 mb-3 bg-red-50 rounded-xl px-4 py-3">
+              <p className="text-xs font-semibold text-red-600 mb-1">事業責任者からの差し戻しコメント</p>
+              <p className="text-sm text-gray-700">{complaint.supervisor_comment || '（コメントなし）'}</p>
+            </div>
+            <div className="mx-5 mb-4">
+              <textarea
+                value={replyText}
+                onChange={e => setReplyText(e.target.value)}
+                rows={4}
+                placeholder="修正内容・返答を入力してください"
+                className="w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-400 transition resize-none mb-2"
+              />
+              <button
+                onClick={handleSendReply}
+                disabled={replySending || !replyText.trim()}
+                className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {replySending ? '送信中...' : '返答・再提出 →'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ④B 再確認・承認 */}
+        {complaint.status === '是正案再提出' && (
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 border-l-blue-400">
+            <div className="px-5 py-3.5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={cn('w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold', userRole === 'director' ? 'bg-blue-500 text-white' : 'bg-stone-200 text-stone-500')}>🔄</div>
+                <span className="text-sm font-bold text-gray-800">④B 再確認・承認</span>
+              </div>
+              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">返答済み・確認待ち</span>
+            </div>
+            <div className="mx-5 mb-4 bg-stone-50 rounded-xl px-4 py-3">
+              {latestCorrectionReply ? (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 mb-1">管理者からの返答</p>
+                  <p className="text-sm text-gray-700 leading-relaxed">{latestCorrectionReply.content}</p>
+                  <p className="text-xs text-gray-400 mt-1.5">{fmtDateTime(latestCorrectionReply.created_at)}</p>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">返答内容を読み込み中...</p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ⑤ 改善報告書 */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 border-l-lime-400">

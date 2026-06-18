@@ -108,6 +108,9 @@ export default function DeepAnalysisForm() {
   const [deepRejectReason, setDeepRejectReason] = useState('')
   const [deepActing, setDeepActing] = useState(false)
 
+  // 是正案再提出（manager の返答）
+  const [latestCorrectionReply, setLatestCorrectionReply] = useState(null)
+
   useEffect(() => {
     const t = setInterval(() => setTick(n => n + 1), 1000)
     return () => clearInterval(t)
@@ -128,6 +131,8 @@ export default function DeepAnalysisForm() {
       const r = logs.filter(l => l.type === 'report').pop()
       if (r) setReportLog(r)
       setSupervisorCommentLogs(logs.filter(l => l.type === 'supervisor_comment'))
+      const replyLog = logs.filter(l => l.type === 'correction_reply').pop()
+      if (replyLog) setLatestCorrectionReply(replyLog)
     }
     if (corr && corr[0]) setCorrection(corr[0])
     if (deep && deep[0]) {
@@ -278,7 +283,7 @@ export default function DeepAnalysisForm() {
   const taCls = 'w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition resize-none'
   const labelCls = 'block text-xs font-semibold text-gray-600 mb-1.5'
   const guideCls = 'text-xs text-gray-400 mb-2 italic'
-  const isApprovalPhase = complaint.status === '是正案提出'
+  const isApprovalPhase = ['是正案提出', '是正案再提出'].includes(complaint.status)
 
   // タイマー（改善報告書の提出日時から24時間）
   const isDeepSubmitted = !!existing || complaint.status === '深掘り提出'
@@ -351,6 +356,14 @@ export default function DeepAnalysisForm() {
       {/* ── 対応案承認フェーズ ── */}
       {isApprovalPhase && (
         <>
+          {complaint.status === '是正案再提出' && latestCorrectionReply && (
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl px-5 py-4 mb-4">
+              <p className="text-xs font-semibold text-blue-700 mb-1">管理者からの返答（再提出）</p>
+              <p className="text-sm text-gray-700 leading-relaxed">{latestCorrectionReply.content}</p>
+              <p className="text-xs text-gray-400 mt-1.5">{fmtDateTime(latestCorrectionReply.created_at)}</p>
+            </div>
+          )}
+
           {complaint.judgment !== '手直し' && (
             <>
               <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-5">

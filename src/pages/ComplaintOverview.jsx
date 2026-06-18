@@ -164,29 +164,6 @@ export default function ComplaintOverview() {
   const approvedCount = approvals.filter(a => a.status === 'approved').length
   const supervisorConfirmed = supervisorCommentLogs.length > 0 || !!complaint.supervisor_comment
 
-  const actionButton =
-    // admin（管理者）
-    userRole === 'admin' && ['受付済', '対応中', '是正案差し戻し'].includes(complaint.status)
-      ? { label: '対応入力 →',           path: `/complaints/${id}/detail`,         color: 'bg-emerald-700 hover:bg-emerald-800' } :
-    userRole === 'admin' && complaint.status === '是正案承認'
-      ? { label: '改善報告書を作成 →',   path: `/complaints/${id}/correction`,     color: 'bg-emerald-700 hover:bg-emerald-800' } :
-    userRole === 'admin' && complaint.status === '改善報告書提出'
-      ? { label: '改善報告書を確認 →',   path: `/complaints/${id}/correction`,     color: 'bg-emerald-700 hover:bg-emerald-800' } :
-    // manager（主任クラス）
-    userRole === 'manager' && ['是正案提出', '是正案差し戻し'].includes(complaint.status)
-      ? { label: '是正案を確認・承認 →', path: `/complaints/${id}/deep-analysis`,  color: 'bg-blue-700 hover:bg-blue-800' } :
-    userRole === 'manager' && ['是正案承認', '改善報告書提出'].includes(complaint.status) && !deepAnalysis
-      ? { label: '深掘り分析を入力 →',   path: `/complaints/${id}/deep-analysis`,  color: 'bg-blue-700 hover:bg-blue-800' } :
-    // director（事業責任者）: 是正案の承認・却下
-    userRole === 'director' && ['是正案提出', '是正案差し戻し'].includes(complaint.status)
-      ? { label: '是正案を確認・承認 →', path: `/complaints/${id}/deep-analysis`,  color: 'bg-amber-600 hover:bg-amber-700' } :
-    userRole === 'director' && complaint.status === '深掘り提出' && !deepAnalysis
-      ? { label: '深掘り分析を入力 →',   path: `/complaints/${id}/deep-analysis`,  color: 'bg-blue-600 hover:bg-blue-700' } :
-    // judgment / executive（役員）: 深掘り結果を承認
-    ['judgment', 'executive'].includes(userRole) && complaint.status === '深掘り提出'
-      ? { label: '役員承認へ →',         path: `/complaints/${id}/approval`,       color: 'bg-purple-700 hover:bg-purple-800' } :
-    null
-
   return (
     <div className="px-6 py-6 max-w-6xl mx-auto">
       <button onClick={() => navigate('/dashboard')}
@@ -367,6 +344,14 @@ export default function ComplaintOverview() {
               <button onClick={() => navigate(`/complaints/${id}/deep-analysis`)}
                 className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold transition-colors">
                 是正案を確認・承認 →
+              </button>
+            </div>
+          )}
+          {userRole === 'manager' && complaint.status === '是正案差し戻し' && (
+            <div className="mx-5 mb-4">
+              <button onClick={() => navigate(`/complaints/${id}/correction`)}
+                className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold transition-colors">
+                是正案を修正・再提出 →
               </button>
             </div>
           )}

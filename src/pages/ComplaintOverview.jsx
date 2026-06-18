@@ -110,6 +110,9 @@ export default function ComplaintOverview() {
   const [latestCorrectionReply, setLatestCorrectionReply] = useState(null)
   const [replyText,    setReplyText]    = useState('')
   const [replySending, setReplySending] = useState(false)
+  const [resubmitActing,       setResubmitActing]       = useState(false)
+  const [showResubmitReject,   setShowResubmitReject]   = useState(false)
+  const [resubmitRejectComment, setResubmitRejectComment] = useState('')
   const [userRole,     setUserRole]     = useState(null)
   const [loading,      setLoading]      = useState(true)
 
@@ -155,6 +158,35 @@ export default function ComplaintOverview() {
   }, [id])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  const handleResubmitApprove = async () => {
+    setResubmitActing(true)
+    const now = new Date().toISOString()
+    await supabase.from('complaints').update({
+      status: '是正案承認', supervisor_approved_at: now, current_turn_started_at: now,
+    }).eq('id', id)
+    await supabase.from('complaint_logs').insert({
+      complaint_id: id, type: 'supervisor_comment', content: '承認（再提出）'
+    })
+    setResubmitActing(false)
+    fetchData()
+  }
+
+  const handleResubmitReject = async () => {
+    if (!resubmitRejectComment.trim()) return
+    setResubmitActing(true)
+    await supabase.from('complaints').update({
+      status: '是正案差し戻し', supervisor_comment: resubmitRejectComment.trim(),
+      current_turn_started_at: new Date().toISOString(),
+    }).eq('id', id)
+    await supabase.from('complaint_logs').insert({
+      complaint_id: id, type: 'supervisor_comment', content: `差し戻し: ${resubmitRejectComment.trim()}`
+    })
+    setResubmitActing(false)
+    setShowResubmitReject(false)
+    setResubmitRejectComment('')
+    fetchData()
+  }
 
   const handleSendReply = async () => {
     if (!replyText.trim()) return
@@ -374,14 +406,6 @@ export default function ComplaintOverview() {
               </button>
             </div>
           )}
-          {userRole === 'director' && complaint.status === '是正案再提出' && (
-            <div className="mx-5 mb-4">
-              <button onClick={() => navigate(`/complaints/${id}/deep-analysis`)}
-                className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold transition-colors">
-                再提出内容を確認・承認 →
-              </button>
-            </div>
-          )}
         </div>
           )
         })()}
@@ -440,6 +464,44 @@ export default function ComplaintOverview() {
                 <p className="text-sm text-gray-400">返答内容を読み込み中...</p>
               )}
             </div>
+            {userRole === 'director' && (
+              <div className="mx-5 mb-4">
+                {!showResubmitReject ? (
+                  <div className="flex gap-3">
+                    <button onClick={() => setShowResubmitReject(true)} disabled={resubmitActing}
+                      className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold transition-colors disabled:opacity-40">
+                      差し戻し
+                    </button>
+                    <button onClick={handleResubmitApprove} disabled={resubmitActing}
+                      className="flex-1 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold transition-colors disabled:opacity-40">
+                      {resubmitActing ? '処理中...' : '承認'}
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold text-red-700 mb-2">差し戻しコメントを入力してください（必須）</p>
+                    <textarea
+                      value={resubmitRejectComment}
+                      onChange={e => setResubmitRejectComment(e.target.value)}
+                      rows={3}
+                      placeholder="差し戻し理由を入力してください"
+                      className="w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-400 transition resize-none mb-2"
+                    />
+                    <div className="flex gap-3">
+                      <button onClick={() => { setShowResubmitReject(false); setResubmitRejectComment('') }}
+                        className="flex-1 py-2.5 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50">
+                        キャンセル
+                      </button>
+                      <button onClick={handleResubmitReject}
+                        disabled={resubmitActing || !resubmitRejectComment.trim()}
+                        className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold transition-colors disabled:opacity-40">
+                        {resubmitActing ? '処理中...' : '差し戻して戻る'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
 

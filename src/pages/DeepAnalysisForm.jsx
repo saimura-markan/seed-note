@@ -278,7 +278,7 @@ export default function DeepAnalysisForm() {
   const taCls = 'w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition resize-none'
   const labelCls = 'block text-xs font-semibold text-gray-600 mb-1.5'
   const guideCls = 'text-xs text-gray-400 mb-2 italic'
-  const isApprovalPhase = ['是正案提出', '是正案差し戻し'].includes(complaint.status)
+  const isApprovalPhase = complaint.status === '是正案提出'
 
   // タイマー（改善報告書の提出日時から24時間）
   const isDeepSubmitted = !!existing || complaint.status === '深掘り提出'
@@ -449,6 +449,20 @@ export default function DeepAnalysisForm() {
             </div>
           </div>
         </>
+      )}
+
+      {/* ── 是正案差し戻し済み ── */}
+      {complaint.status === '是正案差し戻し' && (
+        <div className="bg-orange-50 border border-orange-200 rounded-2xl px-5 py-4 mb-4">
+          <p className="text-sm font-bold text-orange-800">⚠️ 是正案を差し戻し済みです</p>
+          <p className="text-sm text-orange-700 mt-1">管理者の修正・再提出をお待ちください。</p>
+          {complaint.supervisor_comment && (
+            <div className="mt-3 bg-white rounded-xl px-4 py-3 text-sm text-gray-700 border border-orange-100">
+              <p className="text-xs font-semibold text-gray-500 mb-1">差し戻しコメント</p>
+              {complaint.supervisor_comment}
+            </div>
+          )}
+        </div>
       )}
 
       {/* ── 是正案承認済み：コメントセクション（改善報告書未提出の場合のみ） ── */}

@@ -421,6 +421,10 @@ export default function ComplaintOverview() {
           // logsがある場合は supervisor_comment を表示しない（重複防止）
           const showLegacy = !hasLogs && !!complaint.supervisor_comment
           const confirmed  = hasLogs || showLegacy
+          // 承認時刻：complaints.supervisor_approved_at → 最新のsupervisor_commentログ順にフォールバック
+          const approvedAt = complaint.supervisor_approved_at
+            || supervisorCommentLogs.filter(l => !l.content?.startsWith('差し戻し')).pop()?.created_at
+            || null
           return (
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 border-l-amber-400">
           <div className="px-5 py-3.5 flex items-center justify-between">
@@ -428,7 +432,13 @@ export default function ComplaintOverview() {
               <div className={cn('w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold', confirmed ? 'bg-emerald-500 text-white' : 'bg-stone-200 text-stone-500')}>4</div>
               <span className="text-sm font-bold text-gray-800">事業責任者確認</span>
             </div>
-            <span className={cn('text-xs font-bold px-2.5 py-1 rounded-full', confirmed ? 'bg-emerald-100 text-emerald-700' : 'text-stone-400')}>{confirmed ? '確認済み' : '未記録'}</span>
+            {confirmed ? (
+              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                ✅ 承認済み{approvedAt ? `：${fmtDateTime(approvedAt)}` : ''}
+              </span>
+            ) : (
+              <span className="text-xs font-bold px-2.5 py-1 rounded-full text-stone-400">未記録</span>
+            )}
           </div>
           <div className="mx-5 mb-4 bg-stone-50 rounded-xl px-4 py-3">
             {hasLogs ? (

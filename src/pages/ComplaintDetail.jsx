@@ -301,9 +301,12 @@ export default function ComplaintDetail() {
     </div>
   )
 
-  const timer = contactLogs.length > 0
-    ? calcElapsed(complaint.received_at, contactLogs[0].created_at)
-    : calcTimer(complaint.received_at, complaint.deadline_minutes)
+  const TIMER_DONE_STATUSES = ['是正案承認', '改善報告書提出', 'correction_rejected', '深掘り提出', '役員再協議', '承認完了']
+  const timer = TIMER_DONE_STATUSES.includes(complaint.status)
+    ? null
+    : contactLogs.length > 0
+      ? calcElapsed(complaint.received_at, contactLogs[0].created_at)
+      : calcTimer(complaint.received_at, complaint.deadline_minutes)
 
   return (
     <div className="px-6 py-6 max-w-6xl mx-auto">

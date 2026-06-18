@@ -13,8 +13,10 @@ const BULLETIN_PERIODS = [
 ]
 
 function BulletinCard({ post }) {
-  const c    = post.content || {}
-  const deep = post.deep    || {}
+  const c          = post.content   || {}
+  const deep       = post.deep      || {}
+  const rejections = post.rejections || []
+  const negReplies = post.negReplies || []
   const date = post.created_at
     ? new Date(post.created_at).toLocaleDateString('ja-JP', { year: 'numeric', month: 'numeric', day: 'numeric' })
     : '—'
@@ -119,6 +121,25 @@ function BulletinCard({ post }) {
             </div>
           </div>
         )}
+        {rejections.length > 0 && (
+          <div>
+            <p className="text-[11px] font-bold text-gray-400 mb-2">■ 役員からの指摘・最終対策</p>
+            <div className="space-y-1.5">
+              {rejections.map((a, i) => (
+                <div key={i} className="border-l-2 border-amber-400 bg-amber-50 rounded-r-lg px-3 py-2 text-sm">
+                  <p className="text-[10px] font-bold text-amber-600 mb-0.5">役員指摘（{a.approver_name}）</p>
+                  <p className="text-gray-700">{a.comment}</p>
+                </div>
+              ))}
+              {negReplies.map((r, i) => (
+                <div key={i} className="border-l-2 border-emerald-500 bg-emerald-50 rounded-r-lg px-3 py-2 text-sm">
+                  <p className="text-[10px] font-bold text-emerald-600 mb-0.5">→ 対応（事業責任者）</p>
+                  <p className="text-gray-700">{r.content}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -140,8 +161,9 @@ export default function BulletinBoard() {
         .order('created_at', { ascending: false })
       if (!posts) { setBulletinLoading(false); return }
 
-      // complaint_idのリストでdeep_analysisを一括取得
       const ids = posts.map(p => p.complaint_id).filter(Boolean)
+
+      // deep_analysis を一括取得
       let deepMap = {}
       if (ids.length > 0) {
         const { data: deepRows } = await supabase
@@ -151,7 +173,46 @@ export default function BulletinBoard() {
         if (deepRows) deepRows.forEach(d => { deepMap[d.complaint_id] = d })
       }
 
-      setBulletinPosts(posts.map(p => ({ ...p, deep: deepMap[p.complaint_id] ?? null })))
+      // 役員否認コメントを一括取得（comment が残っているもののみ）
+      let rejectionsMap = {}
+      if (ids.length > 0) {
+        const { data: approvalRows } = await supabase
+          .from('complaint_approvals')
+          .select('complaint_id, approver_name, comment')
+          .in('complaint_id', ids)
+          .not('comment', 'is', null)
+          .neq('comment', '')
+        if (approvalRows) {
+          approvalRows.forEach(a => {
+            if (!rejectionsMap[a.complaint_id]) rejectionsMap[a.complaint_id] = []
+            rejectionsMap[a.complaint_id].push(a)
+          })
+        }
+      }
+
+      // 事業責任者の返答ログを一括取得
+      let negReplyMap = {}
+      if (ids.length > 0) {
+        const { data: negRows } = await supabase
+          .from('complaint_logs')
+          .select('complaint_id, content, created_at')
+          .in('complaint_id', ids)
+          .eq('type', 'negotiation_reply')
+          .order('created_at', { ascending: true })
+        if (negRows) {
+          negRows.forEach(n => {
+            if (!negReplyMap[n.complaint_id]) negReplyMap[n.complaint_id] = []
+            negReplyMap[n.complaint_id].push(n)
+          })
+        }
+      }
+
+      setBulletinPosts(posts.map(p => ({
+        ...p,
+        deep:       deepMap[p.complaint_id]       ?? null,
+        rejections: rejectionsMap[p.complaint_id] ?? [],
+        negReplies: negReplyMap[p.complaint_id]   ?? [],
+      })))
       setBulletinLoading(false)
     }
     load()

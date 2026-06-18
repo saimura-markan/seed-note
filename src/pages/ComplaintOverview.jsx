@@ -230,7 +230,7 @@ export default function ComplaintOverview() {
       complaint_id: id, type: 'negotiation_reply', content: negotiationComment.trim(),
     })
     await supabase.from('complaint_approvals')
-      .update({ status: 'pending', comment: '', approved_at: null })
+      .update({ status: 'pending', approved_at: null })
       .eq('complaint_id', id)
       .eq('status', 'rejected')
     await supabase.from('complaints').update({

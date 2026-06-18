@@ -107,10 +107,11 @@ export default function Approval() {
   const [hearingText,           setHearingText]           = useState('')
   const [supervisorCommentLogs, setSupervisorCommentLogs] = useState([])
 
-  const [comments,          setComments]          = useState({})
-  const [saving,            setSaving]            = useState({})
-  const [revisionSnapshot,  setRevisionSnapshot]  = useState(null)
-  const [loading,           setLoading]           = useState(true)
+  const [comments,           setComments]           = useState({})
+  const [saving,             setSaving]             = useState({})
+  const [revisionSnapshot,   setRevisionSnapshot]   = useState(null)
+  const [negotiationReplies, setNegotiationReplies] = useState([])
+  const [loading,            setLoading]            = useState(true)
 
   useEffect(() => {
     const t = setInterval(() => setTick(n => n + 1), 1000)
@@ -146,6 +147,7 @@ export default function Approval() {
       setSupervisorCommentLogs(logs.filter(l => l.type === 'supervisor_comment'))
       const snapLog = logs.filter(l => l.type === 'deep_revision_snapshot').pop()
       if (snapLog) { try { setRevisionSnapshot(JSON.parse(snapLog.content)) } catch {} }
+      setNegotiationReplies(logs.filter(l => l.type === 'negotiation_reply'))
     }
     if (corr && corr[0]) setCorrection(corr[0])
     setLoading(false)
@@ -168,9 +170,9 @@ export default function Approval() {
     // 否認時は complaint を差し戻しに
     if (status === 'rejected') {
       await supabase.from('complaints').update({
-        status: '役員差し戻し', current_turn_started_at: new Date().toISOString(),
+        status: '役員再協議', current_turn_started_at: new Date().toISOString(),
       }).eq('id', id)
-      setComplaint(c => ({ ...c, status: '役員差し戻し' }))
+      setComplaint(c => ({ ...c, status: '役員再協議' }))
     }
 
     // 全員承認済みなら complaint を完了に
@@ -384,6 +386,19 @@ export default function Approval() {
               </span>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 再協議：directorの返答ログ */}
+      {negotiationReplies.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 mb-5">
+          <p className="text-sm font-bold text-blue-700 mb-3">💬 事業責任者からの返答</p>
+          {negotiationReplies.map((r, i) => (
+            <div key={i} className="bg-white rounded-xl border border-blue-100 px-4 py-3 mb-2 last:mb-0">
+              <p className="text-sm text-gray-700">{r.content}</p>
+              <p className="text-xs text-gray-400 mt-1">{fmtDateTime(r.created_at)}</p>
+            </div>
+          ))}
         </div>
       )}
 

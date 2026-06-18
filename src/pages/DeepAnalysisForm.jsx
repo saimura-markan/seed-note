@@ -226,7 +226,7 @@ export default function DeepAnalysisForm() {
       action_assignee: actionAssignee, action_deadline: actionDeadline || null, action_progress: actionProgress,
     }
     if (existing) {
-      if (complaint.status === '役員差し戻し') {
+      if (complaint.status === '役員再協議') {
         await supabase.from('complaint_logs').insert({
           complaint_id: id, type: 'deep_revision_snapshot',
           content: JSON.stringify({
@@ -242,15 +242,16 @@ export default function DeepAnalysisForm() {
         await supabase.from('complaint_approvals')
           .update({ status: 'pending', comment: '', approved_at: null })
           .eq('complaint_id', id)
+          .eq('status', 'rejected')
       }
       await supabase.from('complaint_deep_analysis').update(payload).eq('id', existing.id)
     } else {
       await supabase.from('complaint_deep_analysis').insert(payload)
     }
     const APPROVERS = [
-      { approver_name: '山口 誠',   approver_role: '代表取締役',           sort_order: 0 },
-      { approver_name: '佐々木 隆', approver_role: '取締役 工事部長',      sort_order: 1 },
-      { approver_name: '川上 直美', approver_role: '取締役 品質管理責任者', sort_order: 2 },
+      { approver_name: '斎村',   approver_role: '代表取締役',           sort_order: 0 },
+      { approver_name: '小笠原', approver_role: '取締役 工事部長',      sort_order: 1 },
+      { approver_name: '榮藤',   approver_role: '取締役 品質管理責任者', sort_order: 2 },
     ]
     const { data: existingApprovals } = await supabase.from('complaint_approvals').select('id').eq('complaint_id', id)
     if (!existingApprovals || existingApprovals.length === 0) {
@@ -307,7 +308,7 @@ export default function DeepAnalysisForm() {
   const labelCls = 'block text-xs font-semibold text-gray-600 mb-1.5'
   const guideCls = 'text-xs text-gray-400 mb-2 italic'
   const isApprovalPhase = ['是正案提出', '是正案再提出'].includes(complaint.status)
-  const isRevision = complaint.status === '役員差し戻し'
+  const isRevision = complaint.status === '役員再協議'
 
   // タイマー（改善報告書の提出日時から24時間）
   const isDeepSubmitted = !!existing || complaint.status === '深掘り提出'
@@ -982,7 +983,7 @@ export default function DeepAnalysisForm() {
         </>
       )}
 
-      {/* ── 役員差し戻し：修正フォーム ── */}
+      {/* ── 役員再協議：修正フォーム ── */}
       {isRevision && (
         <>
           {/* 差し戻し通知 */}

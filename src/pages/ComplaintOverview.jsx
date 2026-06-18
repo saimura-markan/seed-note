@@ -12,7 +12,7 @@ function statusToStep(status) {
     '対応中': 1,
     '是正案提出': 2, '是正案差し戻し': 2, '是正案再提出': 2, '是正案承認': 2,
     '改善報告書提出': 3, 'correction_rejected': 3,
-    '深掘り提出': 5, '役員差し戻し': 5,
+    '深掘り提出': 5, '役員再協議': 5,
     '承認完了': 6,
   }
   return map[status] ?? 0
@@ -127,9 +127,12 @@ export default function ComplaintOverview() {
   const [latestCorrectionReply, setLatestCorrectionReply] = useState(null)
   const [replyText,    setReplyText]    = useState('')
   const [replySending, setReplySending] = useState(false)
-  const [resubmitActing,       setResubmitActing]       = useState(false)
-  const [showResubmitReject,   setShowResubmitReject]   = useState(false)
+  const [resubmitActing,        setResubmitActing]        = useState(false)
+  const [showResubmitReject,    setShowResubmitReject]    = useState(false)
   const [resubmitRejectComment, setResubmitRejectComment] = useState('')
+  const [negotiationComment,    setNegotiationComment]    = useState('')
+  const [negotiationSending,    setNegotiationSending]    = useState(false)
+  const [negotiationReplies,    setNegotiationReplies]    = useState([])
   const [userRole,     setUserRole]     = useState(null)
   const [loading,      setLoading]      = useState(true)
 
@@ -162,6 +165,7 @@ export default function ComplaintOverview() {
       setSupervisorCommentLogs(logs.filter(l => l.type === 'supervisor_comment'))
       const replyLog = logs.filter(l => l.type === 'correction_reply').pop()
       if (replyLog) setLatestCorrectionReply(replyLog)
+      setNegotiationReplies(logs.filter(l => l.type === 'negotiation_reply'))
     }
     if (corr && corr[0]) setCorrection(corr[0])
     if (deep && deep[0]) setDeepAnalysis(deep[0])
@@ -219,6 +223,24 @@ export default function ComplaintOverview() {
     fetchData()
   }
 
+  const handleNegotiationReply = async () => {
+    if (!negotiationComment.trim()) return
+    setNegotiationSending(true)
+    await supabase.from('complaint_logs').insert({
+      complaint_id: id, type: 'negotiation_reply', content: negotiationComment.trim(),
+    })
+    await supabase.from('complaint_approvals')
+      .update({ status: 'pending', comment: '', approved_at: null })
+      .eq('complaint_id', id)
+      .eq('status', 'rejected')
+    await supabase.from('complaints').update({
+      status: '深掘り提出', current_turn_started_at: new Date().toISOString(),
+    }).eq('id', id)
+    setNegotiationSending(false)
+    setNegotiationComment('')
+    fetchData()
+  }
+
   if (loading) return (
     <div className="flex items-center justify-center py-32 text-gray-400">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mr-3" />読み込み中...
@@ -234,7 +256,7 @@ export default function ComplaintOverview() {
 
   const PAST_STEP4 = ['是正案提出', '是正案差し戻し', '是正案再提出', '是正案承認', '改善報告書提出', 'correction_rejected', '深掘り提出', '承認完了']
   const PAST_STEP5 = ['是正案承認', '改善報告書提出', 'correction_rejected', '深掘り提出', '承認完了']
-  const PAST_STEP6 = ['改善報告書提出', '深掘り提出', '役員差し戻し', '承認完了']
+  const PAST_STEP6 = ['改善報告書提出', '深掘り提出', '役員再協議', '承認完了']
   const step2Locked = contactLogs.length === 0
   const step3Locked = !hasHearing
   const step4Locked = !PAST_STEP4.includes(complaint.status)
@@ -646,31 +668,51 @@ export default function ComplaintOverview() {
 
         {/* ⑦ 役員承認 */}
         {step7Locked ? <LockedStep num="7" title="役員承認" /> : (
-        <div className={cn('bg-white rounded-2xl shadow-sm overflow-hidden border-l-4', complaint.status === '役員差し戻し' ? 'border-l-red-400' : 'border-l-emerald-400')}>
+        <div className={cn('bg-white rounded-2xl shadow-sm overflow-hidden border-l-4', complaint.status === '役員再協議' ? 'border-l-orange-400' : 'border-l-emerald-400')}>
           <div className="px-5 py-3.5 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className={cn('w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold', approvals.length > 0 && approvedCount === approvals.length ? 'bg-emerald-500 text-white' : complaint.status === '役員差し戻し' ? 'bg-red-400 text-white' : 'bg-stone-200 text-stone-500')}>7</div>
+              <div className={cn('w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold', approvals.length > 0 && approvedCount === approvals.length ? 'bg-emerald-500 text-white' : complaint.status === '役員再協議' ? 'bg-orange-400 text-white' : 'bg-stone-200 text-stone-500')}>7</div>
               <span className="text-sm font-bold text-gray-800">役員承認記録</span>
             </div>
-            <span className={cn('text-xs font-bold px-2.5 py-1 rounded-full', approvals.length > 0 && approvedCount === approvals.length ? 'bg-emerald-100 text-emerald-700' : complaint.status === '役員差し戻し' ? 'bg-red-100 text-red-700' : 'text-stone-400')}>
-              {complaint.status === '役員差し戻し' ? '差し戻し中' : approvals.length > 0 && approvedCount === approvals.length ? '承認済' : approvals.length > 0 ? `${approvedCount}/${approvals.length}名承認` : '承認待ち'}
+            <span className={cn('text-xs font-bold px-2.5 py-1 rounded-full', approvals.length > 0 && approvedCount === approvals.length ? 'bg-emerald-100 text-emerald-700' : complaint.status === '役員再協議' ? 'bg-orange-100 text-orange-700' : 'text-stone-400')}>
+              {complaint.status === '役員再協議' ? '再協議中' : approvals.length > 0 && approvedCount === approvals.length ? '承認済' : approvals.length > 0 ? `${approvedCount}/${approvals.length}名承認` : '承認待ち'}
             </span>
           </div>
-          {complaint.status === '役員差し戻し' && (
-            <div className="mx-5 mb-3 bg-red-50 rounded-xl px-4 py-3">
-              <p className="text-xs font-semibold text-red-700 mb-1">⚠️ 役員から差し戻しがありました</p>
+          {complaint.status === '役員再協議' && (
+            <div className="mx-5 mb-3 bg-orange-50 rounded-xl px-4 py-3">
+              <p className="text-xs font-semibold text-orange-700 mb-2">⚠️ 役員から否認がありました。返答・修正コメントを送信してください。</p>
               {approvals.filter(a => a.status === 'rejected').map((a, i) => (
-                <div key={i} className="text-sm text-gray-700">
-                  <span className="font-semibold text-red-600">{a.approver_name}：</span>{a.comment || '（コメントなし）'}
+                <div key={i} className="bg-white rounded-xl border border-orange-200 px-3 py-2 mb-2 last:mb-0">
+                  <p className="text-xs font-semibold text-red-600 mb-0.5">
+                    {a.approver_name}（{a.approver_role}）さんが否認しました
+                  </p>
+                  <p className="text-sm text-gray-700">否認理由：{a.comment || '（コメントなし）'}</p>
                 </div>
               ))}
+              {negotiationReplies.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-orange-100">
+                  <p className="text-xs text-orange-600 font-semibold mb-1">過去の返答：</p>
+                  {negotiationReplies.map((r, i) => (
+                    <p key={i} className="text-xs text-gray-600 bg-white rounded-lg px-2 py-1 mb-1">{r.content}</p>
+                  ))}
+                </div>
+              )}
             </div>
           )}
-          {complaint.status === '役員差し戻し' && ['director', 'admin'].includes(userRole) && (
-            <div className="mx-5 mb-3">
-              <button onClick={() => navigate(`/complaints/${id}/deep-analysis`)}
-                className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold transition-colors">
-                合同改善報告書を修正する →
+          {complaint.status === '役員再協議' && ['director', 'admin'].includes(userRole) && (
+            <div className="mx-5 mb-3 space-y-2">
+              <textarea
+                value={negotiationComment}
+                onChange={e => setNegotiationComment(e.target.value)}
+                rows={3}
+                placeholder="返答・修正コメントを入力してください（否認した役員に届きます）"
+                className="w-full px-3 py-2.5 rounded-xl border border-orange-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-400 transition resize-none"
+              />
+              <button
+                onClick={handleNegotiationReply}
+                disabled={negotiationSending || !negotiationComment.trim()}
+                className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold transition-colors disabled:opacity-40">
+                {negotiationSending ? '送信中...' : '返答して再提出 →'}
               </button>
             </div>
           )}

@@ -918,11 +918,11 @@ export default function DeepAnalysisForm() {
                   <div className="flex gap-3">
                     <button type="button" onClick={() => setShowDeepReject(true)}
                       className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm transition-colors">
-                      否認（差し戻し）
+                      いいえ（再度修正）
                     </button>
                     <button type="button" onClick={handleDeepApprove} disabled={deepActing}
                       className="flex-1 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm disabled:opacity-40 transition-colors">
-                      {deepActing ? '処理中...' : 'はい・役員承認へ →'}
+                      {deepActing ? '処理中...' : 'はい（送信）'}
                     </button>
                   </div>
                 </>

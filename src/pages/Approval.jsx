@@ -107,9 +107,10 @@ export default function Approval() {
   const [hearingText,           setHearingText]           = useState('')
   const [supervisorCommentLogs, setSupervisorCommentLogs] = useState([])
 
-  const [comments,  setComments]  = useState({})
-  const [saving,    setSaving]    = useState({})
-  const [loading,   setLoading]   = useState(true)
+  const [comments,          setComments]          = useState({})
+  const [saving,            setSaving]            = useState({})
+  const [revisionSnapshot,  setRevisionSnapshot]  = useState(null)
+  const [loading,           setLoading]           = useState(true)
 
   useEffect(() => {
     const t = setInterval(() => setTick(n => n + 1), 1000)
@@ -143,6 +144,8 @@ export default function Approval() {
       const h = logs.filter(l => l.type === 'hearing').pop()
       if (h) setHearingText(h.content)
       setSupervisorCommentLogs(logs.filter(l => l.type === 'supervisor_comment'))
+      const snapLog = logs.filter(l => l.type === 'deep_revision_snapshot').pop()
+      if (snapLog) { try { setRevisionSnapshot(JSON.parse(snapLog.content)) } catch {} }
     }
     if (corr && corr[0]) setCorrection(corr[0])
     setLoading(false)
@@ -161,6 +164,14 @@ export default function Approval() {
     setApprovals(prev => prev.map(a =>
       a.id === approvalId ? { ...a, status, comment: comments[approvalId] || '', approved_at: new Date().toISOString() } : a
     ))
+
+    // 否認時は complaint を差し戻しに
+    if (status === 'rejected') {
+      await supabase.from('complaints').update({
+        status: '役員差し戻し', current_turn_started_at: new Date().toISOString(),
+      }).eq('id', id)
+      setComplaint(c => ({ ...c, status: '役員差し戻し' }))
+    }
 
     // 全員承認済みなら complaint を完了に
     const updated = approvals.map(a =>
@@ -318,10 +329,34 @@ export default function Approval() {
 
             <div>
               <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 border-b border-stone-100 pb-1">■ 深掘り分析（事業責任者）</p>
+              {revisionSnapshot && (
+                <div className="text-xs bg-yellow-50 border border-yellow-300 rounded-xl px-3 py-2 mb-2 text-yellow-800 font-semibold">
+                  🔄 修正再提出済み — 変更箇所を黄色でハイライトしています
+                </div>
+              )}
               <div className="space-y-1.5 text-gray-700">
-                <p>・真因：{analysis.root_cause || '—'}</p>
-                <p>・組織改善案：{analysis.org_improvement || '—'}</p>
-                <p>・根源テーマ：{analysis.root_theme || '—'}</p>
+                {[
+                  { label: '真因', cur: analysis.root_cause, prev: revisionSnapshot?.root_cause },
+                  { label: '組織改善案', cur: analysis.org_improvement, prev: revisionSnapshot?.org_improvement },
+                  { label: '真因カテゴリー', cur: analysis.root_theme, prev: revisionSnapshot?.root_theme },
+                  { label: '真因詳細', cur: analysis.root_detail, prev: revisionSnapshot?.root_detail },
+                  { label: '横展開 周知内容', cur: analysis.horizontal_content, prev: revisionSnapshot?.horizontal_content },
+                  { label: '担当者', cur: analysis.action_assignee, prev: revisionSnapshot?.action_assignee },
+                  { label: '期限', cur: analysis.action_deadline, prev: revisionSnapshot?.action_deadline },
+                  { label: '進捗', cur: analysis.action_progress, prev: revisionSnapshot?.action_progress },
+                ].map(({ label, cur, prev }) => {
+                  const changed = revisionSnapshot && prev !== undefined && prev !== cur
+                  return (
+                    <div key={label}>
+                      <span className={cn('inline', changed ? 'bg-yellow-100 rounded px-1' : '')}>
+                        ・{label}：{cur || '—'}
+                      </span>
+                      {changed && (
+                        <span className="ml-2 text-xs text-yellow-700">（変更前: {prev || '空白'}）</span>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
 

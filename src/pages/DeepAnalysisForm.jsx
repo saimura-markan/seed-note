@@ -109,6 +109,7 @@ export default function DeepAnalysisForm() {
   const [deepActing, setDeepActing] = useState(false)
   const [deepEditMode, setDeepEditMode] = useState(false)
   const [deepSent, setDeepSent] = useState(false)
+  const [rejectedApprovals, setRejectedApprovals] = useState([])
 
   // 是正案再提出（manager の返答）
   const [latestCorrectionReply, setLatestCorrectionReply] = useState(null)
@@ -119,11 +120,12 @@ export default function DeepAnalysisForm() {
   }, [])
 
   const fetchData = useCallback(async () => {
-    const [{ data: c }, { data: logs }, { data: corr }, { data: deep }] = await Promise.all([
+    const [{ data: c }, { data: logs }, { data: corr }, { data: deep }, { data: appr }] = await Promise.all([
       supabase.from('complaints').select('*').eq('id', id).maybeSingle(),
       supabase.from('complaint_logs').select('*').eq('complaint_id', id).order('created_at'),
       supabase.from('complaint_corrections').select('*').eq('complaint_id', id).order('created_at').limit(1),
       supabase.from('complaint_deep_analysis').select('*').eq('complaint_id', id).order('created_at').limit(1),
+      supabase.from('complaint_approvals').select('*').eq('complaint_id', id).order('sort_order'),
     ])
     if (c) { setComplaint(c); setSupervisorComment(c.supervisor_comment || '') }
     if (logs) {
@@ -153,6 +155,7 @@ export default function DeepAnalysisForm() {
     if (c && c.status === '深掘り提出' && !(deep && deep[0])) {
       setCorrectionApproved(true)
     }
+    if (appr) setRejectedApprovals(appr.filter(a => a.status === 'rejected'))
     setLoading(false)
   }, [id])
 
@@ -223,6 +226,23 @@ export default function DeepAnalysisForm() {
       action_assignee: actionAssignee, action_deadline: actionDeadline || null, action_progress: actionProgress,
     }
     if (existing) {
+      if (complaint.status === '役員差し戻し') {
+        await supabase.from('complaint_logs').insert({
+          complaint_id: id, type: 'deep_revision_snapshot',
+          content: JSON.stringify({
+            root_cause: existing.root_cause || '', root_theme: existing.root_theme || '',
+            root_detail: existing.root_detail || '', org_improvement: existing.org_improvement || '',
+            horizontal_departments: existing.horizontal_departments || [],
+            horizontal_content: existing.horizontal_content || '',
+            action_assignee: existing.action_assignee || '',
+            action_deadline: existing.action_deadline || '',
+            action_progress: existing.action_progress || '',
+          })
+        })
+        await supabase.from('complaint_approvals')
+          .update({ status: 'pending', comment: '', approved_at: null })
+          .eq('complaint_id', id)
+      }
       await supabase.from('complaint_deep_analysis').update(payload).eq('id', existing.id)
     } else {
       await supabase.from('complaint_deep_analysis').insert(payload)
@@ -287,6 +307,7 @@ export default function DeepAnalysisForm() {
   const labelCls = 'block text-xs font-semibold text-gray-600 mb-1.5'
   const guideCls = 'text-xs text-gray-400 mb-2 italic'
   const isApprovalPhase = ['是正案提出', '是正案再提出'].includes(complaint.status)
+  const isRevision = complaint.status === '役員差し戻し'
 
   // タイマー（改善報告書の提出日時から24時間）
   const isDeepSubmitted = !!existing || complaint.status === '深掘り提出'
@@ -957,6 +978,199 @@ export default function DeepAnalysisForm() {
                 </>
               )}
             </div>
+          </div>
+        </>
+      )}
+
+      {/* ── 役員差し戻し：修正フォーム ── */}
+      {isRevision && (
+        <>
+          {/* 差し戻し通知 */}
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-5 mb-5">
+            <p className="text-sm font-bold text-red-700 mb-1">⚠️ 役員から差し戻しがありました</p>
+            <p className="text-sm text-red-600 mb-3">合同改善報告書を修正して再提出してください。再提出後、役員全員に再承認依頼が送信されます。</p>
+            {rejectedApprovals.length > 0 && (
+              <div className="space-y-2">
+                {rejectedApprovals.map(a => (
+                  <div key={a.id} className="bg-white rounded-xl border border-red-200 px-4 py-2.5">
+                    <p className="text-xs font-semibold text-red-600 mb-0.5">{a.approver_name}（{a.approver_role}）</p>
+                    <p className="text-sm text-gray-700">{a.comment || '（コメントなし）'}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 修正フォーム（差分ハイライト付き） */}
+          <div className="bg-white rounded-2xl shadow-sm mb-4 p-5 space-y-5">
+            <p className="text-sm font-bold text-gray-800">🔍 深掘り分析の修正</p>
+
+            {[
+              { label: '真因', key: 'root_cause', val: rootCause, set: setRootCause, rows: 3 },
+              { label: '組織改善案', key: 'org_improvement', val: orgImprove, set: setOrgImprove, rows: 3 },
+              { label: '真因詳細', key: 'root_detail', val: rootDetail, set: setRootDetail, rows: 4 },
+            ].map(({ label, key, val, set, rows }) => {
+              const prev = existing?.[key] || ''
+              const changed = prev !== val
+              return (
+                <div key={key}>
+                  <label className={labelCls}>{label} <span className="text-red-500">*</span></label>
+                  {changed && prev && (
+                    <div className="text-xs bg-yellow-100 border border-yellow-300 rounded-xl px-3 py-1.5 mb-1.5 text-yellow-800">
+                      <span className="font-semibold">変更前：</span>{prev}
+                    </div>
+                  )}
+                  <textarea value={val} onChange={e => set(e.target.value)} rows={rows}
+                    className={cn(taCls, changed && prev !== undefined ? 'border-yellow-400 bg-yellow-50' : '')} />
+                </div>
+              )
+            })}
+
+            {/* 真因カテゴリー */}
+            {(() => {
+              const prev = existing?.root_theme || ''
+              const changed = prev !== rootTheme
+              return (
+                <div>
+                  <label className={labelCls}>真因カテゴリー <span className="text-red-500">*</span></label>
+                  {changed && prev && (
+                    <div className="text-xs bg-yellow-100 border border-yellow-300 rounded-xl px-3 py-1.5 mb-1.5 text-yellow-800">
+                      <span className="font-semibold">変更前：</span>{prev}
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {ROOT_THEMES.map(theme => (
+                      <button key={theme} type="button" onClick={() => setRootTheme(theme)}
+                        className={cn('px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all',
+                          rootTheme === theme
+                            ? (changed ? 'bg-yellow-500 text-white border-yellow-500' : 'bg-emerald-700 text-white border-emerald-700')
+                            : 'bg-white text-gray-600 border-stone-200 hover:border-emerald-300 hover:bg-emerald-50')}>
+                        {theme}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+
+          {/* 横展開 */}
+          <div className="bg-white rounded-2xl shadow-sm mb-4 p-5 space-y-4">
+            <p className="text-sm font-bold text-gray-800">📢 横展開</p>
+            {(() => {
+              const prevDepts = [...(existing?.horizontal_departments || [])].sort().join(',')
+              const currDepts = [...horizDepts].sort().join(',')
+              const changed = prevDepts !== currDepts
+              return (
+                <div>
+                  <label className={labelCls}>対象部署 <span className="text-red-500">*</span></label>
+                  {changed && (
+                    <div className="text-xs bg-yellow-100 border border-yellow-300 rounded-xl px-3 py-1.5 mb-1.5 text-yellow-800">
+                      <span className="font-semibold">変更前：</span>{existing?.horizontal_departments?.join('・') || '（なし）'}
+                    </div>
+                  )}
+                  <div className={cn('flex flex-wrap gap-3 mt-2 p-3 rounded-xl', changed ? 'bg-yellow-50 border border-yellow-300' : '')}>
+                    {DEPARTMENTS.map(dept => (
+                      <label key={dept} className="flex items-center gap-1.5 cursor-pointer select-none">
+                        <input type="checkbox" checked={horizDepts.includes(dept)}
+                          onChange={e => setHorizDepts(prev => e.target.checked ? [...prev, dept] : prev.filter(d => d !== dept))}
+                          className="w-4 h-4 accent-emerald-600" />
+                        <span className="text-sm text-gray-700">{dept}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+            {(() => {
+              const prev = existing?.horizontal_content || ''
+              const changed = prev !== horizContent
+              return (
+                <div>
+                  <label className={labelCls}>周知内容 <span className="text-red-500">*</span></label>
+                  {changed && prev && (
+                    <div className="text-xs bg-yellow-100 border border-yellow-300 rounded-xl px-3 py-1.5 mb-1.5 text-yellow-800">
+                      <span className="font-semibold">変更前：</span>{prev}
+                    </div>
+                  )}
+                  <textarea value={horizContent} onChange={e => setHorizContent(e.target.value)}
+                    rows={3} className={cn(taCls, changed && prev ? 'border-yellow-400 bg-yellow-50' : '')} />
+                </div>
+              )
+            })()}
+          </div>
+
+          {/* 真因対策 */}
+          <div className="bg-white rounded-2xl shadow-sm mb-5 p-5 space-y-4">
+            <p className="text-sm font-bold text-gray-800">🎯 真因対策</p>
+            {(() => {
+              const prev = existing?.action_assignee || ''
+              const changed = prev !== actionAssignee
+              return (
+                <div>
+                  <label className={labelCls}>担当者 <span className="text-red-500">*</span></label>
+                  {changed && prev && (
+                    <div className="text-xs bg-yellow-100 border border-yellow-300 rounded-xl px-3 py-1.5 mb-1.5 text-yellow-800">
+                      <span className="font-semibold">変更前：</span>{prev}
+                    </div>
+                  )}
+                  <input type="text" value={actionAssignee} onChange={e => setActionAssignee(e.target.value)}
+                    placeholder="例：山田 太郎"
+                    className={cn('w-full px-3 py-2.5 rounded-xl border text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition',
+                      changed && prev ? 'border-yellow-400 bg-yellow-50' : 'border-stone-200')} />
+                </div>
+              )
+            })()}
+            {(() => {
+              const prev = existing?.action_deadline || ''
+              const changed = prev !== actionDeadline
+              return (
+                <div>
+                  <label className={labelCls}>期限 <span className="text-red-500">*</span></label>
+                  {changed && prev && (
+                    <div className="text-xs bg-yellow-100 border border-yellow-300 rounded-xl px-3 py-1.5 mb-1.5 text-yellow-800">
+                      <span className="font-semibold">変更前：</span>{prev}
+                    </div>
+                  )}
+                  <input type="date" value={actionDeadline} onChange={e => setActionDeadline(e.target.value)}
+                    className={cn('w-full px-3 py-2.5 rounded-xl border text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition',
+                      changed && prev ? 'border-yellow-400 bg-yellow-50' : 'border-stone-200')} />
+                </div>
+              )
+            })()}
+            {(() => {
+              const prev = existing?.action_progress || ''
+              const changed = prev !== actionProgress
+              return (
+                <div>
+                  <label className={labelCls}>進捗状況 <span className="text-red-500">*</span></label>
+                  {changed && prev && (
+                    <div className="text-xs bg-yellow-100 border border-yellow-300 rounded-xl px-3 py-1.5 mb-1.5 text-yellow-800">
+                      <span className="font-semibold">変更前：</span>{prev}
+                    </div>
+                  )}
+                  <div className={cn('flex gap-5 mt-1 p-2 rounded-xl', changed ? 'bg-yellow-50' : '')}>
+                    {['未着手', '進行中', '完了'].map(p => (
+                      <label key={p} className="flex items-center gap-1.5 cursor-pointer select-none">
+                        <input type="radio" name="revision_action_progress" value={p} checked={actionProgress === p}
+                          onChange={() => setActionProgress(p)} className="accent-emerald-600" />
+                        <span className={cn('text-sm font-semibold',
+                          p === '完了' ? 'text-emerald-700' : p === '進行中' ? 'text-blue-700' : 'text-gray-500')}>
+                          {p}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+
+          <div className="pb-8">
+            <button type="button" onClick={handleSubmit} disabled={submitting || !canSubmit}
+              className="w-full h-12 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold disabled:opacity-40 transition-colors">
+              {submitting ? '送信中...' : '修正して再提出 →'}
+            </button>
           </div>
         </>
       )}

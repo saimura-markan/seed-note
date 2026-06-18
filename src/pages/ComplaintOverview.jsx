@@ -12,7 +12,7 @@ function statusToStep(status) {
     '対応中': 1,
     '是正案提出': 2, '是正案差し戻し': 2, '是正案再提出': 2, '是正案承認': 2,
     '改善報告書提出': 3, 'correction_rejected': 3,
-    '深掘り提出': 5,
+    '深掘り提出': 5, '役員差し戻し': 5,
     '承認完了': 6,
   }
   return map[status] ?? 0
@@ -74,6 +74,23 @@ function ProgressBar({ status }) {
             </div>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+function LockedStep({ num, title }) {
+  return (
+    <div className="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 border-l-stone-200 opacity-50">
+      <div className="px-5 py-3.5 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold bg-stone-200 text-stone-400">{num}</div>
+          <span className="text-sm font-bold text-stone-400">{title}</span>
+        </div>
+        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-stone-100 text-stone-400">🔒</span>
+      </div>
+      <div className="mx-5 mb-3 px-4 py-2">
+        <p className="text-sm text-stone-400">前のステップが完了すると表示されます</p>
       </div>
     </div>
   )
@@ -215,6 +232,16 @@ export default function ComplaintOverview() {
   const approvedCount = approvals.filter(a => a.status === 'approved').length
   const supervisorConfirmed = supervisorCommentLogs.length > 0 || !!complaint.supervisor_comment
 
+  const PAST_STEP4 = ['是正案提出', '是正案差し戻し', '是正案再提出', '是正案承認', '改善報告書提出', 'correction_rejected', '深掘り提出', '承認完了']
+  const PAST_STEP5 = ['是正案承認', '改善報告書提出', 'correction_rejected', '深掘り提出', '承認完了']
+  const PAST_STEP6 = ['改善報告書提出', '深掘り提出', '役員差し戻し', '承認完了']
+  const step2Locked = contactLogs.length === 0
+  const step3Locked = !hasHearing
+  const step4Locked = !PAST_STEP4.includes(complaint.status)
+  const step5Locked = !PAST_STEP5.includes(complaint.status)
+  const step6Locked = !PAST_STEP6.includes(complaint.status)
+  const step7Locked = !deepAnalysis
+
   return (
     <div className="px-6 py-6 max-w-6xl mx-auto">
       <button onClick={() => navigate('/dashboard')}
@@ -311,6 +338,7 @@ export default function ComplaintOverview() {
         </div>
 
         {/* ② 聞き取り */}
+        {step2Locked ? <LockedStep num="2" title="作業者からの聞き取り" /> : (
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 border-l-blue-400">
           <div className="px-5 py-3.5 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -335,8 +363,10 @@ export default function ComplaintOverview() {
             )}
           </div>
         </div>
+        )}
 
         {/* ③ 対応案 */}
+        {step3Locked ? <LockedStep num="3" title="対応案" /> : (
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 border-l-violet-400">
           <div className="px-5 py-3.5 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -361,9 +391,10 @@ export default function ComplaintOverview() {
             </div>
           )}
         </div>
+        )}
 
         {/* ④ 事業責任者確認 */}
-        {(() => {
+        {step4Locked ? <LockedStep num="4" title="事業責任者確認" /> : (() => {
           const hasLogs    = supervisorCommentLogs.length > 0
           // logsがある場合は supervisor_comment を表示しない（重複防止）
           const showLegacy = !hasLogs && !!complaint.supervisor_comment
@@ -506,6 +537,7 @@ export default function ComplaintOverview() {
         )}
 
         {/* ⑤ 改善報告書 */}
+        {step5Locked ? <LockedStep num="5" title="改善報告書" /> : (
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 border-l-lime-400">
           <div className="px-5 py-3.5 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -545,8 +577,10 @@ export default function ComplaintOverview() {
             </div>
           )}
         </div>
+        )}
 
         {/* ⑥ 深掘り分析 */}
+        {step6Locked ? <LockedStep num="6" title="深掘り分析" /> : (
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 border-l-orange-400">
           <div className="px-5 py-3.5 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -608,18 +642,38 @@ export default function ComplaintOverview() {
             </div>
           )}
         </div>
+        )}
 
         {/* ⑦ 役員承認 */}
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 border-l-emerald-400">
+        {step7Locked ? <LockedStep num="7" title="役員承認" /> : (
+        <div className={cn('bg-white rounded-2xl shadow-sm overflow-hidden border-l-4', complaint.status === '役員差し戻し' ? 'border-l-red-400' : 'border-l-emerald-400')}>
           <div className="px-5 py-3.5 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className={cn('w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold', approvals.length > 0 && approvedCount === approvals.length ? 'bg-emerald-500 text-white' : 'bg-stone-200 text-stone-500')}>7</div>
+              <div className={cn('w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold', approvals.length > 0 && approvedCount === approvals.length ? 'bg-emerald-500 text-white' : complaint.status === '役員差し戻し' ? 'bg-red-400 text-white' : 'bg-stone-200 text-stone-500')}>7</div>
               <span className="text-sm font-bold text-gray-800">役員承認記録</span>
             </div>
-            <span className={cn('text-xs font-bold px-2.5 py-1 rounded-full', approvals.length > 0 && approvedCount === approvals.length ? 'bg-emerald-100 text-emerald-700' : 'text-stone-400')}>
-              {approvals.length > 0 && approvedCount === approvals.length ? '承認済' : approvals.length > 0 ? `${approvedCount}/${approvals.length}名承認` : '承認待ち'}
+            <span className={cn('text-xs font-bold px-2.5 py-1 rounded-full', approvals.length > 0 && approvedCount === approvals.length ? 'bg-emerald-100 text-emerald-700' : complaint.status === '役員差し戻し' ? 'bg-red-100 text-red-700' : 'text-stone-400')}>
+              {complaint.status === '役員差し戻し' ? '差し戻し中' : approvals.length > 0 && approvedCount === approvals.length ? '承認済' : approvals.length > 0 ? `${approvedCount}/${approvals.length}名承認` : '承認待ち'}
             </span>
           </div>
+          {complaint.status === '役員差し戻し' && (
+            <div className="mx-5 mb-3 bg-red-50 rounded-xl px-4 py-3">
+              <p className="text-xs font-semibold text-red-700 mb-1">⚠️ 役員から差し戻しがありました</p>
+              {approvals.filter(a => a.status === 'rejected').map((a, i) => (
+                <div key={i} className="text-sm text-gray-700">
+                  <span className="font-semibold text-red-600">{a.approver_name}：</span>{a.comment || '（コメントなし）'}
+                </div>
+              ))}
+            </div>
+          )}
+          {complaint.status === '役員差し戻し' && ['director', 'admin'].includes(userRole) && (
+            <div className="mx-5 mb-3">
+              <button onClick={() => navigate(`/complaints/${id}/deep-analysis`)}
+                className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold transition-colors">
+                合同改善報告書を修正する →
+              </button>
+            </div>
+          )}
           {['executive', 'admin'].includes(userRole) && deepAnalysis && complaint.status === '深掘り提出' && !(approvals.length > 0 && approvedCount === approvals.length) && (
             <div className="mx-5 mb-3">
               <button onClick={() => navigate(`/complaints/${id}/approval`)}
@@ -651,6 +705,7 @@ export default function ComplaintOverview() {
             )}
           </div>
         </div>
+        )}
 
       </div>
 

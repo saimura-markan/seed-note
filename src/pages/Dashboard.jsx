@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const STATUS_ORDER = ['受付済', '対応中', '是正案提出', '是正案差し戻し', '是正案再提出', '是正案承認', '改善報告書提出', '深掘り提出', '承認完了']
+const STATUS_ORDER = ['受付済', '対応中', '是正案提出', '是正案差し戻し', '是正案再提出', '是正案承認', '改善報告書提出', '深掘り提出', '役員差し戻し', '承認完了']
 
 const STATUS_TO_STEP = {
   '受付済':         0,
@@ -17,6 +17,7 @@ const STATUS_TO_STEP = {
   '是正案承認':     3,
   '改善報告書提出': 3,
   '深掘り提出':     4,
+  '役員差し戻し':   4,
   '承認完了':       5,
 }
 
@@ -46,6 +47,7 @@ const STATUS_BADGE = {
   '是正案承認':     'bg-green-100 text-green-700 border border-green-200',
   '改善報告書提出': 'bg-blue-100 text-blue-700 border border-blue-200',
   '深掘り提出':     'bg-indigo-100 text-indigo-700 border border-indigo-200',
+  '役員差し戻し':   'bg-red-100 text-red-700 border border-red-200',
   '承認完了':       'bg-emerald-100 text-emerald-700 border border-emerald-200',
 }
 
@@ -61,7 +63,7 @@ const TAG_COLOR = {
 const STATUS_FILTER_GROUPS = {
   '全て':     null,
   '未対応':   ['受付済', '対応中'],
-  '対応中':   ['是正案提出', '是正案差し戻し', '是正案再提出', '是正案承認', '改善報告書提出', '深掘り提出'],
+  '対応中':   ['是正案提出', '是正案差し戻し', '是正案再提出', '是正案承認', '改善報告書提出', '深掘り提出', '役員差し戻し'],
   '承認待ち': [],
   '完了':     ['承認完了'],
 }
@@ -71,7 +73,7 @@ const STATUS_FILTERS = Object.keys(STATUS_FILTER_GROUPS)
 const MY_TURN_STATUSES = {
   manager:   new Set(['受付済', '対応中', '是正案差し戻し', '是正案承認']),
   staff:     new Set(['受付済', '対応中', '是正案差し戻し', '是正案承認']),
-  director:  new Set(['是正案提出', '是正案再提出', '改善報告書提出']),
+  director:  new Set(['是正案提出', '是正案再提出', '改善報告書提出', '役員差し戻し']),
   executive: new Set(['深掘り提出']),
   admin:     new Set(['深掘り提出']),
 }
@@ -80,7 +82,7 @@ const MY_TURN_STATUSES = {
 
 // ステータスごとの期限起点と制限時間を返す
 function deadlineInfo(status, receivedAt, currentTurnStartedAt, deadlineMinutes) {
-  if (['受付済', '対応中', '是正案差し戻し', '是正案再提出'].includes(status)) {
+  if (['受付済', '対応中', '是正案差し戻し', '是正案再提出', '役員差し戻し'].includes(status)) {
     return { startMs: receivedAt, limitMs: deadlineMinutes * 60 * 1000 }
   }
   return { startMs: currentTurnStartedAt ?? receivedAt, limitMs: 24 * 60 * 60 * 1000 }

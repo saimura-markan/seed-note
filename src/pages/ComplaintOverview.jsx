@@ -133,6 +133,7 @@ export default function ComplaintOverview() {
   const [negotiationComment,    setNegotiationComment]    = useState('')
   const [negotiationSending,    setNegotiationSending]    = useState(false)
   const [negotiationReplies,    setNegotiationReplies]    = useState([])
+  const [correctionRejectedLog, setCorrectionRejectedLog] = useState(null)
   const [userRole,     setUserRole]     = useState(null)
   const [loading,      setLoading]      = useState(true)
 
@@ -166,6 +167,8 @@ export default function ComplaintOverview() {
       const replyLog = logs.filter(l => l.type === 'correction_reply').pop()
       if (replyLog) setLatestCorrectionReply(replyLog)
       setNegotiationReplies(logs.filter(l => l.type === 'negotiation_reply'))
+      const rejLog = logs.filter(l => l.type === 'correction_rejected').pop()
+      if (rejLog) setCorrectionRejectedLog(rejLog)
     }
     if (corr && corr[0]) setCorrection(corr[0])
     if (deep && deep[0]) setDeepAnalysis(deep[0])
@@ -581,6 +584,14 @@ export default function ComplaintOverview() {
               : <span className={cn('text-xs font-bold px-2.5 py-1 rounded-full', correction ? 'bg-emerald-100 text-emerald-700' : 'text-stone-400')}>{correction ? '提出済' : '未記録'}</span>
             }
           </div>
+          {userRole === 'director' && complaint.status === '改善報告書提出' && correctionRejectedLog && (
+            <div className="mx-5 mt-1 mb-3 flex items-start gap-3 bg-blue-50 border border-blue-300 rounded-xl px-4 py-3">
+              <span className="text-lg leading-none">📋</span>
+              <p className="text-sm font-semibold text-blue-800 leading-relaxed">
+                管理者より改善報告書の修正提出がありました。ご確認をお願いします。
+              </p>
+            </div>
+          )}
           <div className="mx-5 mb-4 bg-stone-50 rounded-xl px-4 py-3">
             {correction ? (
               <div className="space-y-2 text-sm text-gray-700">
@@ -598,6 +609,12 @@ export default function ComplaintOverview() {
                 className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition-colors">
                 改善報告書を作成する →
               </button>
+            </div>
+          )}
+          {complaint.status === 'correction_rejected' && correctionRejectedLog && (
+            <div className="mx-5 mb-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+              <p className="text-xs font-semibold text-red-700 mb-1">⚠️ 事業責任者からの差し戻しコメント</p>
+              <p className="text-sm text-gray-700 leading-relaxed">{correctionRejectedLog.content}</p>
             </div>
           )}
           {complaint.status === 'correction_rejected' && ['admin', 'manager'].includes(userRole) && (

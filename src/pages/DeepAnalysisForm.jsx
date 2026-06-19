@@ -37,6 +37,7 @@ export default function DeepAnalysisForm() {
   const [newComment,            setNewComment]            = useState('')
   const [sendingComment,        setSendingComment]        = useState(false)
   const [approving,             setApproving]             = useState(false)
+  const [approvalAction,        setApprovalAction]        = useState(null) // null | 'reject' | 'approve'
 
   // 深掘りフォーム
   const [existing,       setExisting]       = useState(null)
@@ -249,7 +250,7 @@ export default function DeepAnalysisForm() {
       await supabase.from('complaint_deep_analysis').insert(payload)
     }
     const APPROVERS = [
-      { approver_name: '斎村',   approver_role: '代表取締役',           sort_order: 0 },
+      { approver_name: '斎村',   approver_role: '専務取締役',           sort_order: 0 },
       { approver_name: '小笠原', approver_role: '取締役 工事部長',      sort_order: 1 },
       { approver_name: '榮藤',   approver_role: '取締役 品質管理責任者', sort_order: 2 },
     ]
@@ -465,21 +466,50 @@ export default function DeepAnalysisForm() {
                     {approving ? '処理中...' : '送信'}
                   </button>
                 </>
+              ) : approvalAction === null ? (
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => setApprovalAction('reject')}
+                    className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm">
+                    否認（差し戻し）
+                  </button>
+                  <button type="button" onClick={() => setApprovalAction('approve')}
+                    className="flex-1 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm">
+                    承認
+                  </button>
+                </div>
+              ) : approvalAction === 'reject' ? (
+                <>
+                  <div>
+                    <label className={labelCls}>差し戻しのコメント <span className="text-red-500">*</span></label>
+                    <textarea value={supervisorComment} onChange={e => setSupervisorComment(e.target.value)}
+                      rows={3} placeholder="差し戻しの理由を入力してください" className={taCls} />
+                  </div>
+                  <div className="flex gap-3">
+                    <button type="button" onClick={() => { setApprovalAction(null); setSupervisorComment('') }}
+                      className="flex-1 py-2.5 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50">
+                      キャンセル
+                    </button>
+                    <button type="button" onClick={handleReject} disabled={approving || !supervisorComment.trim()}
+                      className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm disabled:opacity-40">
+                      {approving ? '処理中...' : '差し戻す'}
+                    </button>
+                  </div>
+                </>
               ) : (
                 <>
                   <div>
-                    <label className={labelCls}>コメント（否認の場合は必須）</label>
+                    <label className={labelCls}>コメント（任意）</label>
                     <textarea value={supervisorComment} onChange={e => setSupervisorComment(e.target.value)}
-                      rows={3} placeholder="承認・否認の理由やフィードバックを記入してください" className={taCls} />
+                      rows={3} placeholder="承認コメントを入力してください（任意）" className={taCls} />
                   </div>
                   <div className="flex gap-3">
-                    <button type="button" onClick={handleReject} disabled={approving}
-                      className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm disabled:opacity-40">
-                      {approving ? '処理中...' : '否認（差し戻し）'}
+                    <button type="button" onClick={() => { setApprovalAction(null); setSupervisorComment('') }}
+                      className="flex-1 py-2.5 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50">
+                      キャンセル
                     </button>
                     <button type="button" onClick={handleApprove} disabled={approving}
                       className="flex-1 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm disabled:opacity-40">
-                      {approving ? '処理中...' : '承認'}
+                      {approving ? '処理中...' : '承認する'}
                     </button>
                   </div>
                 </>
@@ -647,7 +677,7 @@ export default function DeepAnalysisForm() {
                   {rootPhase !== 'q1' && rootAnswers.q1 && (
                     <div>
                       <p className="text-sm font-bold text-gray-800 mb-2">
-                        それはなぜ会社の仕組みとして防げなかったのでしょうか？
+                        会社として何が足りなかったと思いますか？
                       </p>
                       {rootPhase === 'q2' ? (
                         <div className="space-y-2">

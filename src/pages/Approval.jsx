@@ -112,10 +112,17 @@ export default function Approval() {
   const [revisionSnapshot,   setRevisionSnapshot]   = useState(null)
   const [negotiationReplies, setNegotiationReplies] = useState([])
   const [loading,            setLoading]            = useState(true)
+  const [currentUser,        setCurrentUser]        = useState(null)
 
   useEffect(() => {
     const t = setInterval(() => setTick(n => n + 1), 1000)
     return () => clearInterval(t)
+  }, [])
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setCurrentUser(data.session?.user ?? null)
+    })
   }, [])
 
   const fetchData = useCallback(async () => {
@@ -408,6 +415,12 @@ export default function Approval() {
           const done     = appr.status === 'approved'
           const rejected = appr.status === 'rejected'
           const pending  = appr.status === 'pending'
+          const userDisplayName = currentUser?.user_metadata?.full_name
+            || currentUser?.user_metadata?.name
+            || currentUser?.email
+            || ''
+          const isMyCard = userDisplayName.includes(appr.approver_name)
+          const displayRole = appr.approver_name === '斎村' ? '専務取締役' : appr.approver_role
           return (
             <div key={appr.id} className={cn(
               'bg-white rounded-2xl shadow-sm overflow-hidden border-l-4',
@@ -418,7 +431,7 @@ export default function Approval() {
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <p className="font-bold text-gray-900 text-[15px]">{appr.approver_name}</p>
-                    <p className="text-xs text-gray-400">{appr.approver_role}</p>
+                    <p className="text-xs text-gray-400">{displayRole}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     {done && (
@@ -449,8 +462,8 @@ export default function Approval() {
                   <p className="text-xs text-gray-400 mb-2">{fmtDateTime(appr.approved_at)}</p>
                 )}
 
-                {/* 未承認の場合は入力フォーム */}
-                {pending && (
+                {/* 未承認の場合は入力フォーム（自分のカードのみ） */}
+                {pending && isMyCard && (
                   <div className="space-y-2">
                     <textarea
                       value={comments[appr.id] || ''}
@@ -476,6 +489,9 @@ export default function Approval() {
                       </button>
                     </div>
                   </div>
+                )}
+                {pending && !isMyCard && (
+                  <p className="text-xs text-gray-400 italic">このカードへの操作権限がありません</p>
                 )}
               </div>
             </div>

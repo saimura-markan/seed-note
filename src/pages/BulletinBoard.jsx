@@ -101,8 +101,8 @@ function BulletinCard({ post }) {
           </div>
         )}
         {(orgImprove || actionAssignee || actionDeadline) && (
-          <div style={{ borderLeft: '4px solid #10b981', backgroundColor: '#ecfdf5', borderRadius: '0 12px 12px 0', padding: '12px 16px' }}>
-            <p style={{ fontSize: '12px', fontWeight: 700, color: '#065f46', marginBottom: '6px' }}>🏢 組織改善策（再発防止）</p>
+          <div style={{ borderLeft: '4px solid #f97316', backgroundColor: '#fff7ed', borderRadius: '0 12px 12px 0', padding: '12px 16px' }}>
+            <p style={{ fontSize: '12px', fontWeight: 700, color: '#c2410c', marginBottom: '6px' }}>🏢 組織改善策（再発防止）</p>
             {orgImprove && (
               <p className="text-sm text-gray-700 leading-relaxed mb-2">{orgImprove}</p>
             )}

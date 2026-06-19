@@ -16,6 +16,8 @@ import Analytics from './pages/Analytics'
 import BulletinBoard from './pages/BulletinBoard'
 import Register from './pages/Register'
 import ResetPassword from './pages/ResetPassword'
+import PendingApproval from './pages/PendingApproval'
+import AdminUsers from './pages/AdminUsers'
 
 function RoleGuard({ user, allow, deny, children }) {
   const role = getRole(user)
@@ -60,10 +62,12 @@ export default function App() {
         <Route
           path="/*"
           element={
-            user ? (
-              <Layout user={user} onLogout={() => setUser(null)} />
-            ) : (
+            !user ? (
               <Navigate to="/login" replace />
+            ) : getRole(user) === 'user' ? (
+              <PendingApproval onLogout={() => setUser(null)} />
+            ) : (
+              <Layout user={user} onLogout={() => setUser(null)} />
             )
           }
         >
@@ -86,6 +90,9 @@ export default function App() {
           <Route path="mypage" element={<MyPage />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="bulletin-board" element={<BulletinBoard />} />
+          <Route path="admin/users" element={
+            <RoleGuard user={user} allow={['admin']}><AdminUsers /></RoleGuard>
+          } />
         </Route>
       </Routes>
     </BrowserRouter>

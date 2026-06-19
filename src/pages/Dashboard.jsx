@@ -360,6 +360,7 @@ export default function Dashboard() {
   const [tab, setTab] = useState('all')
   const [statusFilter, setStatusFilter] = useState('全て')
   const [userDepartment, setUserDepartment] = useState('')
+  const [pendingUsersCount, setPendingUsersCount] = useState(0)
 
   useEffect(() => {
     const fetch = async () => {
@@ -408,6 +409,12 @@ export default function Dashboard() {
     supabase.from('profiles').select('department').eq('id', user.id).single()
       .then(({ data }) => { if (data?.department) setUserDepartment(data.department) })
   }, [user?.id])
+
+  useEffect(() => {
+    if (role !== 'admin') return
+    supabase.from('profiles').select('id', { count: 'exact', head: true })
+      .then(({ count }) => { if (count) setPendingUsersCount(count) })
+  }, [role])
 
   const actionableSet = useMemo(() => new Set(ACTIONABLE_STATUSES[role] ?? []), [role])
   const actionableCount = useMemo(
@@ -482,13 +489,24 @@ export default function Dashboard() {
             </span>
           )}
         </div>
-        <button
-          onClick={() => navigate('/complaints/new')}
-          className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold px-4 py-2 rounded-xl shadow-sm transition-colors"
-        >
-          <span className="text-base leading-none">＋</span>
-          新規依頼
-        </button>
+        <div className="flex items-center gap-2">
+          {role === 'admin' && pendingUsersCount > 0 && (
+            <button
+              onClick={() => navigate('/admin/users')}
+              className="flex items-center gap-2 bg-amber-50 border border-amber-300 text-amber-800 text-xs font-semibold px-3 py-2 rounded-xl hover:bg-amber-100 transition-colors"
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              承認待ちユーザー {pendingUsersCount} 件
+            </button>
+          )}
+          <button
+            onClick={() => navigate('/complaints/new')}
+            className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold px-4 py-2 rounded-xl shadow-sm transition-colors"
+          >
+            <span className="text-base leading-none">＋</span>
+            新規依頼
+          </button>
+        </div>
       </div>
 
       {/* 未対応警告バナー */}

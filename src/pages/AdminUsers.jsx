@@ -16,7 +16,8 @@ export default function AdminUsers() {
   useEffect(() => {
     supabase
       .from('profiles')
-      .select('id, name, name_kana, department, created_at')
+      .select('id, name, name_kana, department, created_at, seed_note_role')
+      .or('seed_note_role.is.null,seed_note_role.eq.user')
       .order('created_at', { ascending: false })
       .then(({ data }) => {
         setProfiles(data ?? [])
@@ -71,7 +72,7 @@ export default function AdminUsers() {
       ) : (
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-stone-100 bg-stone-50 flex items-center justify-between">
-            <span className="text-xs font-semibold text-gray-500">登録ユーザー一覧</span>
+            <span className="text-xs font-semibold text-gray-500">承認待ちユーザー一覧</span>
             <span className="text-xs font-bold text-gray-700">{profiles.length} 件</span>
           </div>
           <div className="divide-y divide-stone-100">

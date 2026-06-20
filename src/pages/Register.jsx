@@ -80,6 +80,7 @@ export default function Register({ onLogin }) {
         name,
         ...(name_kana && { name_kana }),
         department,
+        seed_note_role: 'pending',
       })
     }
 

@@ -17,7 +17,7 @@ export default function AdminUsers() {
     supabase
       .from('profiles')
       .select('id, name, name_kana, department, created_at, seed_note_role')
-      .or('seed_note_role.is.null,seed_note_role.eq.user')
+      .eq('seed_note_role', 'pending')
       .order('created_at', { ascending: false })
       .then(({ data }) => {
         setProfiles(data ?? [])

@@ -250,9 +250,9 @@ export default function DeepAnalysisForm() {
       await supabase.from('complaint_deep_analysis').insert(payload)
     }
     const APPROVERS = [
-      { approver_name: '斎村',   approver_role: '専務取締役',           sort_order: 0 },
-      { approver_name: '小笠原', approver_role: '取締役 工事部長',      sort_order: 1 },
-      { approver_name: '榮藤',   approver_role: '取締役 品質管理責任者', sort_order: 2 },
+      { approver_name: '斎村 直樹',   approver_role: '専務取締役',           sort_order: 0 },
+      { approver_name: '小笠原 久幸', approver_role: '取締役 工事部長',      sort_order: 1 },
+      { approver_name: '榮藤 美香',   approver_role: '取締役 品質管理責任者', sort_order: 2 },
     ]
     const { data: existingApprovals } = await supabase.from('complaint_approvals').select('id').eq('complaint_id', id)
     if (!existingApprovals || existingApprovals.length === 0) {

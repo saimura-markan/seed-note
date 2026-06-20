@@ -121,7 +121,12 @@ export default function Approval() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      setCurrentUser(data.session?.user ?? null)
+      const u = data.session?.user ?? null
+      setCurrentUser(u)
+      // DEBUG: isMyCard判定に使うuser_metadataを確認
+      console.log('[DEBUG] full_name:', u?.user_metadata?.full_name)
+      console.log('[DEBUG] name:', u?.user_metadata?.name)
+      console.log('[DEBUG] email:', u?.email)
     })
   }, [])
 

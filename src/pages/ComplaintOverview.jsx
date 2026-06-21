@@ -629,7 +629,7 @@ export default function ComplaintOverview() {
         )}
 
         {/* ⑥ 深掘り分析 */}
-        {step6Locked ? <LockedStep num="6" title="深掘り分析" /> : (
+        {(step6Locked && userRole !== 'admin') ? <LockedStep num="6" title="深掘り分析" /> : (
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 border-l-orange-400">
           <div className="px-5 py-3.5 flex items-center justify-between">
             <div className="flex items-center gap-2">

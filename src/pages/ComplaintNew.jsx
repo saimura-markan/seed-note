@@ -82,13 +82,21 @@ export default function ComplaintNew() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
+  // ひらがな→カタカナ変換（「なさ」→「ナサ」で中間一致させるため）
+  const toKatakana = (str) =>
+    str.replace(/[ぁ-ゖ]/g, c => String.fromCharCode(c.charCodeAt(0) + 0x60))
+
   const handleClientNameChange = async (value) => {
     set('clientName', value)
     if (!value.trim()) { setSuggestions([]); setShowSuggestions(false); return }
+    const kata = toKatakana(value)
+    const filter = kata !== value
+      ? `name.ilike.%${value}%,name.ilike.%${kata}%`
+      : `name.ilike.%${value}%`
     const { data } = await supabase
       .from('client_companies')
       .select('id, name')
-      .ilike('name', `%${value}%`)
+      .or(filter)
       .order('name')
       .limit(10)
     setSuggestions(data ?? [])
@@ -97,13 +105,6 @@ export default function ComplaintNew() {
 
   const handleSuggestSelect = (name) => {
     set('clientName', name)
-    setShowSuggestions(false)
-  }
-
-  const handleAddNewClient = async (name) => {
-    const trimmed = name.trim()
-    if (!trimmed) return
-    await supabase.from('client_companies').insert({ name: trimmed })
     setShowSuggestions(false)
   }
 
@@ -225,7 +226,7 @@ export default function ComplaintNew() {
                   placeholder="山田工務店"
                   autoComplete="off"
                 />
-                {showSuggestions && (
+                {showSuggestions && suggestions.length > 0 && (
                   <ul className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-stone-200 rounded-xl shadow-lg overflow-hidden">
                     {suggestions.map(c => (
                       <li key={c.id}
@@ -234,17 +235,6 @@ export default function ComplaintNew() {
                         {c.name}
                       </li>
                     ))}
-                    {form.clientName.trim() && !suggestions.some(c => c.name === form.clientName.trim()) && (
-                      <li
-                        onMouseDown={() => {
-                          if (window.confirm(`「${form.clientName.trim()}」を元請マスタに新規登録しますか？`)) {
-                            handleAddNewClient(form.clientName.trim())
-                          }
-                        }}
-                        className="px-3 py-2.5 text-sm text-emerald-700 font-semibold hover:bg-emerald-50 cursor-pointer border-t border-stone-100">
-                        ＋「{form.clientName.trim()}」を新規登録
-                      </li>
-                    )}
                   </ul>
                 )}
               </div>

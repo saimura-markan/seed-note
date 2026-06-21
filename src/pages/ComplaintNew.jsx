@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -54,6 +54,11 @@ export default function ComplaintNew() {
   const [receivedAt]          = useState(() => new Date())
   const [now, setNow]         = useState(() => new Date())
 
+  // 元請様名サジェスト
+  const [suggestions,     setSuggestions]     = useState([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const suggestRef = useRef(null)
+
   // リアルタイム時計
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000)
@@ -65,6 +70,42 @@ export default function ComplaintNew() {
     const name = profileName || user?.user_metadata?.full_name
     if (name) set('receiverName', name)
   }, [profileName, user])
+
+  // ドロップダウン外クリックで閉じる
+  useEffect(() => {
+    const handler = e => {
+      if (suggestRef.current && !suggestRef.current.contains(e.target)) {
+        setShowSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const handleClientNameChange = async (value) => {
+    set('clientName', value)
+    if (!value.trim()) { setSuggestions([]); setShowSuggestions(false); return }
+    const { data } = await supabase
+      .from('client_companies')
+      .select('id, name')
+      .ilike('name', `%${value}%`)
+      .order('name')
+      .limit(10)
+    setSuggestions(data ?? [])
+    setShowSuggestions(true)
+  }
+
+  const handleSuggestSelect = (name) => {
+    set('clientName', name)
+    setShowSuggestions(false)
+  }
+
+  const handleAddNewClient = async (name) => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    await supabase.from('client_companies').insert({ name: trimmed })
+    setShowSuggestions(false)
+  }
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const handleClear = () => setForm(INITIAL_FORM)
@@ -174,10 +215,38 @@ export default function ComplaintNew() {
           <div className="bg-white rounded-2xl p-5 shadow-sm space-y-4">
             <p className="text-sm font-bold text-gray-800">基本情報</p>
             <div className="grid grid-cols-3 gap-3">
-              <div>
+              <div className="relative" ref={suggestRef}>
                 <label className={labelCls}>元請様名</label>
-                <input value={form.clientName} onChange={e => set('clientName', e.target.value)}
-                  className={inputCls} placeholder="山田工務店" />
+                <input
+                  value={form.clientName}
+                  onChange={e => handleClientNameChange(e.target.value)}
+                  onFocus={() => form.clientName && setShowSuggestions(suggestions.length > 0)}
+                  className={inputCls}
+                  placeholder="山田工務店"
+                  autoComplete="off"
+                />
+                {showSuggestions && (
+                  <ul className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-stone-200 rounded-xl shadow-lg overflow-hidden">
+                    {suggestions.map(c => (
+                      <li key={c.id}
+                        onMouseDown={() => handleSuggestSelect(c.name)}
+                        className="px-3 py-2.5 text-sm text-gray-800 hover:bg-emerald-50 cursor-pointer">
+                        {c.name}
+                      </li>
+                    ))}
+                    {form.clientName.trim() && !suggestions.some(c => c.name === form.clientName.trim()) && (
+                      <li
+                        onMouseDown={() => {
+                          if (window.confirm(`「${form.clientName.trim()}」を元請マスタに新規登録しますか？`)) {
+                            handleAddNewClient(form.clientName.trim())
+                          }
+                        }}
+                        className="px-3 py-2.5 text-sm text-emerald-700 font-semibold hover:bg-emerald-50 cursor-pointer border-t border-stone-100">
+                        ＋「{form.clientName.trim()}」を新規登録
+                      </li>
+                    )}
+                  </ul>
+                )}
               </div>
               <div>
                 <label className={labelCls}>元請担当者様名</label>

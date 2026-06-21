@@ -18,6 +18,7 @@ import Register from './pages/Register'
 import ResetPassword from './pages/ResetPassword'
 import PendingApproval from './pages/PendingApproval'
 import AdminUsers from './pages/AdminUsers'
+import AdminClients from './pages/AdminClients'
 
 function RoleGuard({ user, allow, deny, children }) {
   const role = getRole(user)
@@ -92,6 +93,9 @@ export default function App() {
           <Route path="bulletin-board" element={<BulletinBoard />} />
           <Route path="admin/users" element={
             <RoleGuard user={user} allow={['admin']}><AdminUsers /></RoleGuard>
+          } />
+          <Route path="admin/clients" element={
+            <RoleGuard user={user} allow={['admin']}><AdminClients /></RoleGuard>
           } />
         </Route>
       </Routes>

@@ -2,6 +2,10 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, LabelList, ResponsiveContainer,
+  LineChart, Line, CartesianGrid,
+} from 'recharts'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -36,36 +40,127 @@ function getLast12Months() {
   return result
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── グラフコンポーネント ──────────────────────────────────────────────────────
 
-const MEDAL = ['text-amber-400', 'text-gray-400', 'text-amber-700']
+function HorizontalBarChart({ title, items, color, maxItems = 10 }) {
+  const data = items.slice(0, maxItems)
+  const barHeight = 44
+  const chartHeight = Math.max(data.length * barHeight + 20, 80)
+  const yAxisWidth = Math.min(Math.max(...data.map(d => d.name.length), 4) * 11, 180)
 
-function RankingList({ title, items, barClass = 'bg-emerald-500', maxItems = 5 }) {
-  const top      = items.slice(0, maxItems)
-  const maxCount = top[0]?.count ?? 1
   return (
     <div className="bg-white rounded-2xl p-5 shadow-sm">
       <h3 className="text-sm font-bold text-gray-700 mb-4">{title}</h3>
-      {top.length === 0 ? (
+      {data.length === 0 ? (
+        <p className="text-xs text-gray-400 py-6 text-center">データなし</p>
+      ) : (
+        <ResponsiveContainer width="100%" height={chartHeight}>
+          <BarChart
+            data={data}
+            layout="vertical"
+            margin={{ left: 0, right: 48, top: 4, bottom: 4 }}
+          >
+            <XAxis type="number" hide />
+            <YAxis
+              type="category"
+              dataKey="name"
+              width={yAxisWidth}
+              tick={{ fontSize: 12, fill: '#374151' }}
+              tickLine={false}
+              axisLine={false}
+            />
+            <Tooltip
+              formatter={v => [`${v}件`]}
+              contentStyle={{ borderRadius: '10px', fontSize: '12px', border: '1px solid #e7e5e4' }}
+            />
+            <Bar dataKey="count" fill={color} radius={[0, 4, 4, 0]} maxBarSize={28}>
+              <LabelList
+                dataKey="count"
+                position="right"
+                formatter={v => `${v}件`}
+                style={{ fontSize: 11, fill: '#6b7280', fontWeight: 600 }}
+              />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  )
+}
+
+function TrendLineChart({ data, title, color = '#10b981', highlightKey = null }) {
+  return (
+    <div className="bg-white rounded-2xl p-5 shadow-sm">
+      <h3 className="text-sm font-bold text-gray-700 mb-4">{title}</h3>
+      <ResponsiveContainer width="100%" height={220}>
+        <LineChart data={data} margin={{ left: 0, right: 16, top: 8, bottom: 4 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+          <XAxis
+            dataKey="shortLabel"
+            tick={{ fontSize: 11, fill: '#9ca3af' }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            tick={{ fontSize: 11, fill: '#9ca3af' }}
+            axisLine={false}
+            tickLine={false}
+            allowDecimals={false}
+          />
+          <Tooltip
+            formatter={v => [`${v}件`]}
+            contentStyle={{ borderRadius: '10px', fontSize: '12px', border: '1px solid #e7e5e4' }}
+            labelFormatter={label => `${label}`}
+          />
+          <Line
+            type="monotone"
+            dataKey="count"
+            stroke={color}
+            strokeWidth={2.5}
+            dot={(props) => {
+              const isHighlight = props.payload?.key === highlightKey
+              return (
+                <circle
+                  key={props.key}
+                  cx={props.cx}
+                  cy={props.cy}
+                  r={isHighlight ? 6 : 4}
+                  fill={isHighlight ? color : '#fff'}
+                  stroke={color}
+                  strokeWidth={2}
+                />
+              )
+            }}
+            activeDot={{ r: 6, fill: color }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+// 元請別タブ用の月別内訳リスト（変更なし）
+function MonthlyBreakdownList({ data }) {
+  const max = Math.max(...data.map(d => d.count), 1)
+  const filtered = data.filter(m => m.count > 0).slice().reverse()
+  return (
+    <div className="bg-white rounded-2xl p-5 shadow-sm">
+      <h3 className="text-sm font-bold text-gray-700 mb-4">月別内訳</h3>
+      {filtered.length === 0 ? (
         <p className="text-xs text-gray-400 py-4 text-center">データなし</p>
       ) : (
-        <div className="space-y-3">
-          {top.map((item, i) => (
-            <div key={item.name}>
-              <div className="flex items-center justify-between text-xs mb-1.5">
-                <span className="flex items-center gap-2 min-w-0">
-                  <span className={cn('font-black w-4 shrink-0 text-center', MEDAL[i] ?? 'text-gray-300')}>
-                    {i + 1}
-                  </span>
-                  <span className="text-gray-700 truncate font-medium">{item.name}</span>
-                </span>
-                <span className="font-bold text-gray-700 shrink-0 ml-2">{item.count}件</span>
-              </div>
-              <div className="h-2 rounded-full bg-stone-100">
-                <div
-                  className={cn('h-full rounded-full transition-all duration-300', barClass)}
-                  style={{ width: `${(item.count / maxCount) * 100}%` }}
-                />
+        <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+          {filtered.map(m => (
+            <div key={m.key} className="flex items-center justify-between text-xs">
+              <span className="text-gray-600">{m.label}</span>
+              <div className="flex items-center gap-2">
+                <div className="w-16 h-1.5 rounded-full bg-stone-100">
+                  <div
+                    className="h-full rounded-full bg-orange-300"
+                    style={{ width: `${(m.count / max) * 100}%` }}
+                  />
+                </div>
+                <span className="font-bold text-gray-800 w-8 text-right">{m.count}件</span>
               </div>
             </div>
           ))}
@@ -75,41 +170,13 @@ function RankingList({ title, items, barClass = 'bg-emerald-500', maxItems = 5 }
   )
 }
 
-function MonthlyBarChart({ data, highlightKey = null, title = '月別発生件数推移' }) {
-  const maxCount = Math.max(...data.map(d => d.count), 1)
-  return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm">
-      <h3 className="text-sm font-bold text-gray-700 mb-4">{title}</h3>
-      <div className="flex items-end gap-1 h-28">
-        {data.map(d => {
-          const isHl = d.key === highlightKey
-          return (
-            <div key={d.key} className="flex-1 flex flex-col items-center gap-0.5 min-w-0">
-              <span className="text-[9px] font-bold text-gray-500 leading-none tabular-nums">
-                {d.count > 0 ? d.count : ''}
-              </span>
-              <div
-                className={cn(
-                  'w-full rounded-t-sm transition-all',
-                  isHl ? 'bg-emerald-600' : 'bg-emerald-200'
-                )}
-                style={{
-                  height:    `${(d.count / maxCount) * 72}px`,
-                  minHeight: d.count > 0 ? '3px' : '0',
-                }}
-              />
-              <span className={cn(
-                'text-[8px] leading-none',
-                isHl ? 'font-bold text-emerald-700' : 'text-gray-400'
-              )}>
-                {d.shortLabel}
-              </span>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
+// ─── 色定数 ──────────────────────────────────────────────────────────────────
+
+const COLORS = {
+  rootTheme:  '#ef4444',  // 赤
+  department: '#3b82f6',  // 青
+  company:    '#f97316',  // オレンジ
+  category:   '#8b5cf6',  // 紫
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────
@@ -153,7 +220,6 @@ export default function Analytics() {
     fetchData()
   }, [])
 
-  // Default: set to top-ranking company on first load
   useEffect(() => {
     if (complaints.length > 0 && !selectedCompany) {
       const ranked = rankBy(complaints, c => c.company)
@@ -232,7 +298,6 @@ export default function Analytics() {
 
   return (
     <div className="px-6 py-6 max-w-6xl mx-auto">
-      {/* Back */}
       <div className="mb-5">
         <button
           onClick={() => navigate('/dashboard')}
@@ -242,7 +307,6 @@ export default function Analytics() {
         </button>
       </div>
 
-      {/* Title */}
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-base font-bold text-gray-700">📊 分析・ランキング</h1>
         <span className="text-xs text-gray-400 bg-white px-2.5 py-1 rounded-full shadow-sm">
@@ -272,27 +336,27 @@ export default function Analytics() {
       {tab === 'overall' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <RankingList
+            <HorizontalBarChart
               title="① 真因カテゴリーランキング"
               items={overallRankings.rootTheme}
-              barClass="bg-emerald-500"
+              color={COLORS.rootTheme}
             />
-            <RankingList
+            <HorizontalBarChart
               title="② 担当部署ランキング"
               items={overallRankings.department}
-              barClass="bg-blue-400"
+              color={COLORS.department}
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <RankingList
+            <HorizontalBarChart
               title="③ 元請別ランキング"
               items={overallRankings.company}
-              barClass="bg-orange-400"
+              color={COLORS.company}
             />
-            <RankingList
+            <HorizontalBarChart
               title="④ クレーム項目ランキング"
               items={overallRankings.category}
-              barClass="bg-violet-400"
+              color={COLORS.category}
             />
           </div>
         </div>
@@ -331,32 +395,37 @@ export default function Analytics() {
             </div>
           </div>
 
-          {/* Monthly trend chart with highlight */}
-          <MonthlyBarChart data={monthlyChartData} highlightKey={selectedMonth} />
+          {/* 月別推移 折れ線グラフ */}
+          <TrendLineChart
+            data={monthlyChartData}
+            title="月別発生件数推移"
+            color="#10b981"
+            highlightKey={selectedMonth}
+          />
 
           {/* Rankings for selected month */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <RankingList
+            <HorizontalBarChart
               title="真因カテゴリーランキング"
               items={monthlyRankings.rootTheme}
-              barClass="bg-emerald-500"
+              color={COLORS.rootTheme}
             />
-            <RankingList
+            <HorizontalBarChart
               title="担当部署ランキング"
               items={monthlyRankings.department}
-              barClass="bg-blue-400"
+              color={COLORS.department}
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <RankingList
+            <HorizontalBarChart
               title="元請別ランキング"
               items={monthlyRankings.company}
-              barClass="bg-orange-400"
+              color={COLORS.company}
             />
-            <RankingList
+            <HorizontalBarChart
               title="クレーム項目ランキング"
               items={monthlyRankings.category}
-              barClass="bg-violet-400"
+              color={COLORS.category}
             />
           </div>
         </div>
@@ -369,7 +438,6 @@ export default function Analytics() {
             <p className="text-center py-12 text-gray-400 text-sm">データなし</p>
           ) : (
             <>
-              {/* Company selector */}
               <div className="flex items-center gap-3">
                 <label className="text-sm font-semibold text-gray-600 shrink-0">元請：</label>
                 <select
@@ -385,7 +453,6 @@ export default function Analytics() {
 
               {companyData && (
                 <>
-                  {/* Summary: count + rank */}
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-white rounded-2xl p-5 shadow-sm">
                       <div className="flex items-baseline gap-1">
@@ -413,61 +480,32 @@ export default function Analytics() {
                     </div>
                   </div>
 
-                  {/* Monthly trend chart for this company */}
-                  <MonthlyBarChart
+                  {/* 月別推移 折れ線グラフ */}
+                  <TrendLineChart
                     data={companyData.monthlyData}
                     title={`${selectedCompany} — 月別件数推移`}
+                    color={COLORS.company}
                   />
 
-                  {/* Rankings */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <RankingList
+                    <HorizontalBarChart
                       title="元請担当者ランキング"
                       items={companyData.clientContact}
-                      barClass="bg-orange-400"
+                      color={COLORS.company}
                     />
-                    <RankingList
+                    <HorizontalBarChart
                       title="真因カテゴリーランキング"
                       items={companyData.rootTheme}
-                      barClass="bg-emerald-500"
+                      color={COLORS.rootTheme}
                     />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <RankingList
+                    <HorizontalBarChart
                       title="クレーム項目ランキング"
                       items={companyData.category}
-                      barClass="bg-violet-400"
+                      color={COLORS.category}
                     />
-
-                    {/* Monthly breakdown list */}
-                    <div className="bg-white rounded-2xl p-5 shadow-sm">
-                      <h3 className="text-sm font-bold text-gray-700 mb-4">月別内訳</h3>
-                      {companyData.monthlyData.every(m => m.count === 0) ? (
-                        <p className="text-xs text-gray-400 py-4 text-center">データなし</p>
-                      ) : (
-                        <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-                          {companyData.monthlyData
-                            .filter(m => m.count > 0)
-                            .reverse()
-                            .map(m => (
-                              <div key={m.key} className="flex items-center justify-between text-xs">
-                                <span className="text-gray-600">{m.label}</span>
-                                <div className="flex items-center gap-2">
-                                  <div className="w-16 h-1.5 rounded-full bg-stone-100">
-                                    <div
-                                      className="h-full rounded-full bg-orange-300"
-                                      style={{
-                                        width: `${(m.count / Math.max(...companyData.monthlyData.map(d => d.count), 1)) * 100}%`
-                                      }}
-                                    />
-                                  </div>
-                                  <span className="font-bold text-gray-800 w-8 text-right">{m.count}件</span>
-                                </div>
-                              </div>
-                            ))}
-                        </div>
-                      )}
-                    </div>
+                    <MonthlyBreakdownList data={companyData.monthlyData} />
                   </div>
                 </>
               )}

@@ -351,7 +351,7 @@ function StatusComplaintCard({ c, onClick, role }) {
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { user } = useOutletContext()
+  const { user, profileName } = useOutletContext()
   const role = getRole(user)
   const [complaints, setComplaints] = useState([])
   const [firstContactMap, setFirstContactMap] = useState({})
@@ -361,6 +361,7 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState('全て')
   const [userDepartment, setUserDepartment] = useState('')
   const [pendingUsersCount, setPendingUsersCount] = useState(0)
+  const [myApprovedIds, setMyApprovedIds] = useState(new Set())
 
   useEffect(() => {
     const fetch = async () => {
@@ -417,6 +418,21 @@ export default function Dashboard() {
       .then(({ count }) => { if (count) setPendingUsersCount(count) })
   }, [role])
 
+  useEffect(() => {
+    if (!['executive', 'judgment'].includes(role)) return
+    const displayName = profileName || user?.user_metadata?.full_name || user?.user_metadata?.name || ''
+    if (!displayName) return
+    supabase.from('complaint_approvals')
+      .select('complaint_id, approver_name')
+      .eq('status', 'approved')
+      .then(({ data }) => {
+        const ids = (data ?? [])
+          .filter(a => a.approver_name && displayName.includes(a.approver_name))
+          .map(a => a.complaint_id)
+        setMyApprovedIds(new Set(ids))
+      })
+  }, [role, profileName, user])
+
   const actionableSet = useMemo(() => new Set(ACTIONABLE_STATUSES[role] ?? []), [role])
   const actionableCount = useMemo(
     () => complaints.filter(c => actionableSet.has(c.status)).length,
@@ -427,6 +443,33 @@ export default function Dashboard() {
     if (!statuses) return actionableCount
     return complaints.filter(c => statuses.includes(c.status) && actionableSet.has(c.status)).length
   }
+
+  // ロール別・自分に関係するアクション件数（バナー・ヘッダーバッジ用）
+  const myActionableCount = useMemo(() => {
+    if (role === 'admin') {
+      return complaints.filter(c => actionableSet.has(c.status)).length
+    }
+    if (role === 'manager') {
+      const displayName = profileName || user?.user_metadata?.full_name || user?.user_metadata?.name || ''
+      return complaints.filter(c =>
+        actionableSet.has(c.status) &&
+        userDepartment && c.department === userDepartment &&
+        (!displayName || c.assignee.includes(displayName.split(' ')[0]))
+      ).length
+    }
+    if (role === 'director') {
+      return complaints.filter(c =>
+        ['是正案提出', '是正案再提出'].includes(c.status) &&
+        userDepartment && c.department === userDepartment
+      ).length
+    }
+    if (['executive', 'judgment'].includes(role)) {
+      return complaints.filter(c =>
+        c.status === '深掘り提出' && !myApprovedIds.has(c.id)
+      ).length
+    }
+    return 0
+  }, [complaints, role, actionableSet, userDepartment, myApprovedIds, profileName, user])
 
   const today = new Date().toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' })
 
@@ -484,9 +527,9 @@ export default function Dashboard() {
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-2.5">
           <h1 className="text-base font-bold text-gray-700">クレーム管理ダッシュボード</h1>
-          {actionableCount > 0 && (
+          {myActionableCount > 0 && (
             <span className="animate-pulse bg-red-500 text-white text-sm font-black px-3 py-1 rounded-full min-w-[2rem] text-center shadow-lg shadow-red-200 leading-tight">
-              {actionableCount}
+              {myActionableCount}
             </span>
           )}
         </div>
@@ -511,11 +554,11 @@ export default function Dashboard() {
       </div>
 
       {/* 未対応警告バナー */}
-      {actionableCount > 0 && (
+      {myActionableCount > 0 && (
         <div className="bg-red-50 border-2 border-red-300 rounded-2xl px-5 py-3 mb-5 flex items-center gap-3">
           <span className="text-xl animate-pulse shrink-0">⚠️</span>
           <p className="text-sm font-bold text-red-700">
-            未対応のクレームが{actionableCount}件あります！早急に対応してください！
+            あなたの対応が必要なクレームが{myActionableCount}件あります！早急に対応してください！
           </p>
         </div>
       )}

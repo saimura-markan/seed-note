@@ -539,6 +539,14 @@ export default function Dashboard() {
         >
           🌱 改善報告書掲示板
         </button>
+        {role === 'admin' && (
+          <button
+            onClick={() => navigate('/admin/clients')}
+            className="col-span-2 flex items-center justify-center gap-2 bg-white border border-stone-200 hover:bg-stone-50 text-gray-600 font-semibold text-sm px-4 py-3 rounded-xl shadow-sm transition-colors"
+          >
+            🏢 元請会社マスタ
+          </button>
+        )}
       </div>
 
       {/* Tabs */}

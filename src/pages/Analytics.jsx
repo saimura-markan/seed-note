@@ -46,7 +46,7 @@ function HorizontalBarChart({ title, items, color, maxItems = 10 }) {
   const data = items.slice(0, maxItems)
   const barHeight = 44
   const chartHeight = Math.max(data.length * barHeight + 20, 80)
-  const yAxisWidth = Math.min(Math.max(...data.map(d => d.name.length), 4) * 11, 180)
+  const yAxisWidth = Math.min(Math.max(...data.map(d => d.name.length), 4) * 11, 200)
 
   return (
     <div className="bg-white rounded-2xl p-5 shadow-sm">
@@ -58,21 +58,18 @@ function HorizontalBarChart({ title, items, color, maxItems = 10 }) {
           <BarChart
             data={data}
             layout="vertical"
-            margin={{ left: 0, right: 48, top: 4, bottom: 4 }}
+            margin={{ left: 8, right: 48, top: 4, bottom: 4 }}
           >
             <XAxis type="number" hide />
             <YAxis
               type="category"
               dataKey="name"
-              width={yAxisWidth}
+              width={140}
               tick={{ fontSize: 12, fill: '#374151' }}
               tickLine={false}
               axisLine={false}
             />
-            <Tooltip
-              formatter={v => [`${v}件`]}
-              contentStyle={{ borderRadius: '10px', fontSize: '12px', border: '1px solid #e7e5e4' }}
-            />
+            <Tooltip active={false} />
             <Bar dataKey="count" fill={color} radius={[0, 4, 4, 0]} maxBarSize={28}>
               <LabelList
                 dataKey="count"
@@ -107,11 +104,7 @@ function TrendLineChart({ data, title, color = '#10b981', highlightKey = null })
             tickLine={false}
             allowDecimals={false}
           />
-          <Tooltip
-            formatter={v => [`${v}件`]}
-            contentStyle={{ borderRadius: '10px', fontSize: '12px', border: '1px solid #e7e5e4' }}
-            labelFormatter={label => `${label}`}
-          />
+          <Tooltip active={false} />
           <Line
             type="monotone"
             dataKey="count"

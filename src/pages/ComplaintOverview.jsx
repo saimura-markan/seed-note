@@ -464,7 +464,7 @@ export default function ComplaintOverview() {
               <p className="text-sm text-gray-400">事業責任者の確認待ちです。</p>
             )}
           </div>
-          {userRole === 'director' && complaint.status === '是正案提出' && (
+          {['director', 'admin'].includes(userRole) && complaint.status === '是正案提出' && (
             <div className="mx-5 mb-4">
               <button onClick={() => navigate(`/complaints/${id}/deep-analysis`)}
                 className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold transition-colors">
@@ -530,7 +530,7 @@ export default function ComplaintOverview() {
                 <p className="text-sm text-gray-400">返答内容を読み込み中...</p>
               )}
             </div>
-            {userRole === 'director' && (
+            {['director', 'admin'].includes(userRole) && (
               <div className="mx-5 mb-4">
                 {!showResubmitReject ? (
                   <div className="flex gap-3">
@@ -584,7 +584,7 @@ export default function ComplaintOverview() {
               : <span className={cn('text-xs font-bold px-2.5 py-1 rounded-full', correction ? 'bg-emerald-100 text-emerald-700' : 'text-stone-400')}>{correction ? '提出済' : '未記録'}</span>
             }
           </div>
-          {userRole === 'director' && complaint.status === '改善報告書提出' && correctionRejectedLog && (
+          {['director', 'admin'].includes(userRole) && complaint.status === '改善報告書提出' && correctionRejectedLog && (
             <div className="mx-5 mt-1 mb-3 flex items-start gap-3 bg-blue-50 border border-blue-300 rounded-xl px-4 py-3">
               <span className="text-lg leading-none">📋</span>
               <p className="text-sm font-semibold text-blue-800 leading-relaxed">

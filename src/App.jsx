@@ -83,7 +83,7 @@ export default function App() {
             <RoleGuard user={user} allow={['admin', 'judgment', 'manager']}><CorrectionSubmit /></RoleGuard>
           } />
           <Route path="complaints/:id/deep-analysis" element={
-            <RoleGuard user={user} allow={['manager', 'director']}><DeepAnalysisForm /></RoleGuard>
+            <RoleGuard user={user} allow={['manager', 'director', 'admin']}><DeepAnalysisForm /></RoleGuard>
           } />
           <Route path="complaints/:id/approval" element={
             <RoleGuard user={user} allow={['judgment', 'executive', 'admin']}><Approval /></RoleGuard>

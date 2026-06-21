@@ -135,13 +135,16 @@ export default function ComplaintOverview() {
   const [negotiationReplies,    setNegotiationReplies]    = useState([])
   const [correctionRejectedLog, setCorrectionRejectedLog] = useState(null)
   const [userRole,     setUserRole]     = useState(null)
+  const [currentUser,  setCurrentUser]  = useState(null)
   const [loading,      setLoading]      = useState(true)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      const role = getRole(data.session?.user)
-      console.log('[ComplaintOverview] userRole:', role, '| raw meta:', data.session?.user?.app_metadata)
+      const u = data.session?.user ?? null
+      const role = getRole(u)
+      console.log('[ComplaintOverview] userRole:', role, '| raw meta:', u?.app_metadata)
       setUserRole(role)
+      setCurrentUser(u)
     })
   }, [])
 
@@ -743,14 +746,20 @@ export default function ComplaintOverview() {
               </button>
             </div>
           )}
-          {['executive', 'admin'].includes(userRole) && deepAnalysis && complaint.status === '深掘り提出' && !(approvals.length > 0 && approvedCount === approvals.length) && (
-            <div className="mx-5 mb-3">
-              <button onClick={() => navigate(`/complaints/${id}/approval`)}
-                className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold transition-colors">
-                役員承認を行う →
-              </button>
-            </div>
-          )}
+          {['executive', 'admin'].includes(userRole) && deepAnalysis && complaint.status === '深掘り提出' && !(approvals.length > 0 && approvedCount === approvals.length) && (() => {
+            const displayName = currentUser?.user_metadata?.full_name || currentUser?.user_metadata?.name || currentUser?.email || ''
+            const alreadyApproved = approvals.some(a => displayName.includes(a.approver_name) && a.status === 'approved')
+            return (
+              <div className="mx-5 mb-3">
+                <button
+                  onClick={() => navigate(`/complaints/${id}/approval`)}
+                  disabled={alreadyApproved}
+                  className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                  {alreadyApproved ? '承認済みです' : '役員承認を行う →'}
+                </button>
+              </div>
+            )
+          })()}
           <div className="mx-5 mb-4 bg-stone-50 rounded-xl px-4 py-3">
             {approvals.length > 0 ? (
               <div className="space-y-2">

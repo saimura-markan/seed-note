@@ -413,7 +413,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (role !== 'admin') return
     supabase.from('profiles').select('id', { count: 'exact', head: true })
-      .or('seed_note_role.is.null,seed_note_role.eq.user')
+      .eq('seed_note_role', 'pending')
       .then(({ count }) => { if (count) setPendingUsersCount(count) })
   }, [role])
 

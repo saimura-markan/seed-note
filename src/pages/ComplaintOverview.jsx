@@ -694,7 +694,7 @@ export default function ComplaintOverview() {
         )}
 
         {/* ⑦ 役員承認 */}
-        {step7Locked ? <LockedStep num="7" title="役員承認" /> : (
+        {(step7Locked && userRole !== 'admin') ? <LockedStep num="7" title="役員承認" /> : (
         <div className={cn('bg-white rounded-2xl shadow-sm overflow-hidden border-l-4', complaint.status === '役員再協議' ? 'border-l-orange-400' : 'border-l-emerald-400')}>
           <div className="px-5 py-3.5 flex items-center justify-between">
             <div className="flex items-center gap-2">

@@ -66,7 +66,7 @@ export default function AdminClients() {
           <input
             value={newName}
             onChange={e => { setNewName(e.target.value); setError('') }}
-            onKeyDown={e => e.key === 'Enter' && handleAdd()}
+            onKeyDown={e => e.key === 'Enter' && e.preventDefault()}
             placeholder="会社名を入力"
             className="flex-1 h-10 px-3 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
           />

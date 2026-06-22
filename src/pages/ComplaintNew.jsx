@@ -277,19 +277,19 @@ export default function ComplaintNew() {
                 )}
               </div>
               <div>
-                <label className={labelCls}>元請担当者様名</label>
+                <label className={labelCls}>元請担当者名（フルネーム）</label>
                 <input value={form.clientContact} onChange={e => set('clientContact', e.target.value)}
                   className={inputCls} placeholder="山田 太郎 様" />
               </div>
               <div>
-                <label className={labelCls}>現場名</label>
+                <label className={labelCls}>現場名（ProOneの案件名）</label>
                 <input value={form.siteName} onChange={e => set('siteName', e.target.value)}
                   className={inputCls} placeholder="〇〇ビル A棟" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">現場作業者名</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">現場作業者名（Nisite）</label>
                 <input
                   type="text"
                   placeholder="中村 太郎"

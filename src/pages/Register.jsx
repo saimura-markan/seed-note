@@ -4,10 +4,9 @@ import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 const DEPARTMENTS = [
-  '工事部産廃課/環境リサイクル部',
-  '工事部解体課',
-  '清掃部清掃２課',
-  '清掃部清掃１課',
+  '工事部',
+  '清掃部',
+  '環境リサイクル部',
   '本部',
 ]
 

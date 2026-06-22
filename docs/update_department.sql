@@ -12,6 +12,15 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
+  -- 呼び出し元が admin ロールであることを確認
+  IF NOT EXISTS (
+    SELECT 1 FROM profiles
+    WHERE id = auth.uid()
+      AND seed_note_role = 'admin'
+  ) THEN
+    RAISE EXCEPTION 'permission denied: admin role required';
+  END IF;
+
   UPDATE profiles
   SET    department = p_department
   WHERE  name = p_name;
@@ -22,12 +31,12 @@ BEGIN
 END;
 $$;
 
--- 実行権限を認証済みユーザーに付与（管理者のみ呼び出し想定）
-GRANT EXECUTE ON FUNCTION admin_update_department(text, text) TO authenticated;
+-- 全認証ユーザーへの付与を取り消し、service_role のみに制限
+REVOKE EXECUTE ON FUNCTION admin_update_department(text, text) FROM authenticated;
+GRANT  EXECUTE ON FUNCTION admin_update_department(text, text) TO service_role;
 
 -- ── 使用例 ──────────────────────────────────────────────────────────────────
--- 立花香織の部署を「工事部」に変更する場合：
--- SELECT admin_update_department('立花 香織', '工事部');
+-- Supabase SQL Editor（postgres権限）から直接実行する場合は
+-- RLS をバイパスできるため以下のシンプルなUPDATEが最も安全：
 --
--- または Supabase SQL Editor では RLS が無効なので直接 UPDATE も可：
 -- UPDATE profiles SET department = '工事部' WHERE name = '立花 香織';

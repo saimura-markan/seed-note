@@ -27,10 +27,11 @@ const LEVEL_COLOR = {
 
 // 部署 → 管理者・事業責任者（手動変更可、将来はアカウント紐付け予定）
 const DEPT_STAFF = {
-  '工事部':           { manager: '松木主任', director: '小笠原常務（兼任）' },
+  '工事部 産廃課':    { manager: '新田主任', director: '小笠原常務' },
+  '工事部 解体課':    { manager: '松木主任', director: '小笠原常務' },
   '清掃部':           { manager: '備主任',   director: '川畑次長' },
-  '環境リサイクル部':  { manager: '青柳',     director: '岡橋次長' },
-  '本部':             { manager: '中田主任', director: '榮藤取締役' },
+  '環境リサイクル部': { manager: '青柳主任', director: '川畑次長' },
+  '本部':             { manager: '中田主任', director: '斎村専務' },
 }
 
 const INITIAL_FORM = {

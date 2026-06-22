@@ -411,9 +411,6 @@ export default function ComplaintNew() {
                   )}>
                     --:--
                   </span>
-                  <span className={cn('text-xs', deadlineText[form.emotionLevel])}>
-                    受付後カウント開始
-                  </span>
                 </div>
               </div>
             </div>

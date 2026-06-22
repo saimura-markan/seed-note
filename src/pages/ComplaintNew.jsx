@@ -282,7 +282,7 @@ export default function ComplaintNew() {
                   className={inputCls} placeholder="山田 太郎 様" />
               </div>
               <div>
-                <label className={labelCls}>案件名</label>
+                <label className={labelCls}>案件名（プロワンで表記している案件名）</label>
                 <input value={form.siteName} onChange={e => set('siteName', e.target.value)}
                   className={inputCls} placeholder="〇〇ビル A棟" />
               </div>

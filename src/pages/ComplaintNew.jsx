@@ -393,16 +393,28 @@ export default function ComplaintNew() {
                   Lv.{form.emotionLevel}「{deadlineCfg.label}」→ {deadlineCfg.deadline}分以内
                 </span>
               </div>
-              <div className="mt-2 flex items-center gap-3">
-                <span className={cn(
-                  'text-3xl font-black tabular-nums font-mono',
-                  deadlineText[form.emotionLevel]
-                )}>
-                  --:--
-                </span>
-                <span className={cn('text-xs', deadlineText[form.emotionLevel])}>
-                  受付後カウント開始
-                </span>
+              <div className="mt-2 flex items-center gap-4">
+                {form.emotionLevel >= 3 && (
+                  <div className="flex flex-col items-center leading-none">
+                    <span className={cn('text-3xl font-black tabular-nums', deadlineText[form.emotionLevel])}>
+                      {deadlineCfg.deadline}
+                    </span>
+                    <span className={cn('text-[10px] font-semibold mt-0.5', deadlineText[form.emotionLevel])}>
+                      分以内
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <span className={cn(
+                    'text-3xl font-black tabular-nums font-mono',
+                    deadlineText[form.emotionLevel]
+                  )}>
+                    --:--
+                  </span>
+                  <span className={cn('text-xs', deadlineText[form.emotionLevel])}>
+                    受付後カウント開始
+                  </span>
+                </div>
               </div>
             </div>
           </div>

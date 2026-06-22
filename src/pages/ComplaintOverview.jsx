@@ -303,6 +303,9 @@ export default function ComplaintOverview() {
           <span>現場作業者：<strong className="text-gray-700">{complaint.worker_name || '—'}</strong></span>
           <span>作業日：<strong className="text-gray-700">{complaint.work_date || '—'}</strong></span>
           <span>受付：{fmtDateTime(complaint.received_at)}</span>
+          {complaint.call_completed_at && (
+            <span>主任引継：<strong className="text-gray-700">{fmtDateTime(complaint.call_completed_at)}</strong></span>
+          )}
           <span>ステータス：<strong className="text-gray-700">{complaint.status.replace('是正案', '対応案')}</strong></span>
         </div>
         {complaint.content && (

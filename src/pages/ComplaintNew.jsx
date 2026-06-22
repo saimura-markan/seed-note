@@ -161,9 +161,11 @@ export default function ComplaintNew() {
     const secs = elapsed
     const mins = Math.floor(secs / 60)
     const sec  = secs % 60
+    const callCompletedAt = new Date().toISOString()
     await Promise.all([
       supabase.from('complaints').update({
         call_duration_seconds: secs,
+        call_completed_at:     callCompletedAt,
         status: 'pending',
       }).eq('id', complaintId),
       supabase.from('complaint_logs').insert({
@@ -417,18 +419,9 @@ export default function ComplaintNew() {
                   Lv.{form.emotionLevel}「{deadlineCfg.label}」→ {deadlineCfg.deadline}分以内
                 </span>
               </div>
-              <div className="mt-2 flex items-center gap-3">
-                <span className={cn(
-                  'text-3xl font-black tabular-nums font-mono',
-                  isExpired ? 'text-gray-400' : isUrgent ? 'text-white' : deadlineText[form.emotionLevel]
-                )}>
-                  {remMM}:{remSS}
-                </span>
-                <span className={cn(
-                  'text-xs',
-                  isExpired ? 'text-gray-400' : isUrgent ? 'text-red-100' : deadlineText[form.emotionLevel]
-                )}>
-                  {isExpired ? '期限超過' : '残り時間'}
+              <div className="mt-2">
+                <span className={cn('text-sm font-semibold', deadlineText[form.emotionLevel])}>
+                  「この内容で受け付ける」後にカウントダウン開始
                 </span>
               </div>
             </div>

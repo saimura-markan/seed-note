@@ -178,32 +178,6 @@ export default function ComplaintNew() {
   }
   // ──────────────────────────────────────────────────────────────────────────
 
-  // ─── calling フェーズ画面 ─────────────────────────────────────────────────
-  if (phase === 'calling') {
-    const elMM = String(Math.floor(elapsed / 60)).padStart(2, '0')
-    const elSS = String(elapsed % 60).padStart(2, '0')
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6" style={{ backgroundColor: '#F5F0E8' }}>
-        <div className="bg-white rounded-3xl p-10 shadow-lg text-center w-full max-w-sm">
-          <div className="text-6xl mb-5 animate-pulse">📞</div>
-          <h2 className="text-xl font-bold text-gray-800 mb-1">主任へ電話連絡中...</h2>
-          <p className="text-sm text-gray-500 mb-1">
-            {form.assignee || '担当者'} に連絡してください
-          </p>
-          <p className="text-xs text-gray-400 mb-8">連絡が完了したら下のボタンを押してください</p>
-          <div className="text-6xl font-black tabular-nums font-mono text-emerald-700 mb-10 tracking-wider">
-            {elMM}:{elSS}
-          </div>
-          <button
-            onClick={handleCallComplete}
-            className="w-full h-14 rounded-2xl bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white text-lg font-bold transition-colors shadow-sm">
-            ✓ 連絡完了
-          </button>
-        </div>
-      </div>
-    )
-  }
-
   // 時刻・日付フォーマット
   const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   const currentDate = now.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' })
@@ -419,9 +393,15 @@ export default function ComplaintNew() {
                   Lv.{form.emotionLevel}「{deadlineCfg.label}」→ {deadlineCfg.deadline}分以内
                 </span>
               </div>
-              <div className="mt-2">
-                <span className={cn('text-sm font-semibold', deadlineText[form.emotionLevel])}>
-                  「この内容で受け付ける」後にカウントダウン開始
+              <div className="mt-2 flex items-center gap-3">
+                <span className={cn(
+                  'text-3xl font-black tabular-nums font-mono',
+                  deadlineText[form.emotionLevel]
+                )}>
+                  --:--
+                </span>
+                <span className={cn('text-xs', deadlineText[form.emotionLevel])}>
+                  受付後カウント開始
                 </span>
               </div>
             </div>
@@ -493,6 +473,31 @@ export default function ComplaintNew() {
           </button>
         </div>
       </div>
+
+      {/* ══════════ 電話連絡中パネル（calling フェーズ） ══════════ */}
+      {phase === 'calling' && (() => {
+        const elMM = String(Math.floor(elapsed / 60)).padStart(2, '0')
+        const elSS = String(elapsed % 60).padStart(2, '0')
+        return (
+          <div className="fixed right-4 bottom-24 z-30 w-[280px] bg-white rounded-2xl shadow-2xl border border-stone-200 p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xl animate-pulse">📞</span>
+              <span className="text-sm font-bold text-gray-800">主任へ電話連絡中...</span>
+            </div>
+            <p className="text-xs text-gray-500 mb-3">
+              {form.assignee || '担当者'} に連絡してください
+            </p>
+            <div className="text-4xl font-black tabular-nums font-mono text-emerald-700 text-center mb-4 tracking-wider">
+              {elMM}:{elSS}
+            </div>
+            <button
+              onClick={handleCallComplete}
+              className="w-full h-11 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white text-sm font-bold transition-colors shadow-sm">
+              ✓ 連絡完了
+            </button>
+          </div>
+        )
+      })()}
 
     </div>
   )

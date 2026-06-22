@@ -51,10 +51,14 @@ const labelCls = 'block text-xs font-semibold text-gray-600 mb-1.5'
 export default function ComplaintNew() {
   const navigate = useNavigate()
   const { user, profileName } = useOutletContext()
-  const [form, setForm]       = useState(INITIAL_FORM)
+  const [form, setForm]         = useState(INITIAL_FORM)
   const [submitting, setSubmitting] = useState(false)
-  const [receivedAt]          = useState(() => new Date())
-  const [now, setNow]         = useState(() => new Date())
+  const [receivedAt]            = useState(() => new Date())
+  const [now, setNow]           = useState(() => new Date())
+  const [phase, setPhase]       = useState('form')   // 'form' | 'calling'
+  const [complaintId, setComplaintId] = useState(null)
+  const [callStartTime, setCallStartTime] = useState(0)
+  const [elapsed, setElapsed]   = useState(0)
 
   // 元請様名サジェスト
   const [suggestions,     setSuggestions]     = useState([])
@@ -72,6 +76,15 @@ export default function ComplaintNew() {
     const name = profileName || user?.user_metadata?.full_name
     if (name) set('receiverName', name)
   }, [profileName, user])
+
+  // calling フェーズの経過時間カウントアップ
+  useEffect(() => {
+    if (phase !== 'calling') return
+    const t = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - callStartTime) / 1000))
+    }, 1000)
+    return () => clearInterval(t)
+  }, [phase, callStartTime])
 
   // ドロップダウン外クリックで閉じる
   useEffect(() => {
@@ -113,14 +126,14 @@ export default function ComplaintNew() {
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const handleClear = () => setForm(INITIAL_FORM)
 
-  // ─── 送信ロジック（変更禁止） ──────────────────────────────────────────────
+  // ─── 送信ロジック ─────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!form.content.trim()) return
     setSubmitting(true)
     const deadlineCfg = EMOTION_LEVELS[form.emotionLevel - 1]
     const deadlineMs  = deadlineCfg.deadline * 60 * 1000
-    const { error } = await supabase.from('complaints').insert({
+    const { data, error } = await supabase.from('complaints').insert({
       received_at:       receivedAt.toISOString(),
       client_name:       form.clientName,
       client_contact:    form.clientContact,
@@ -134,13 +147,60 @@ export default function ComplaintNew() {
       department:        form.department,
       assignee:          form.assignee,
       receiver_name:     form.receiverName,
-      status:            '受付済',
-    })
+      status:            'calling',
+    }).select('id').single()
     setSubmitting(false)
     if (error) { alert('登録に失敗しました: ' + error.message); return }
+    setComplaintId(data.id)
+    setCallStartTime(Date.now())
+    setElapsed(0)
+    setPhase('calling')
+  }
+
+  const handleCallComplete = async () => {
+    const secs = elapsed
+    const mins = Math.floor(secs / 60)
+    const sec  = secs % 60
+    await Promise.all([
+      supabase.from('complaints').update({
+        call_duration_seconds: secs,
+        status: 'pending',
+      }).eq('id', complaintId),
+      supabase.from('complaint_logs').insert({
+        complaint_id: complaintId,
+        action:       'call_completed',
+        detail:       `受付〜連絡完了：${mins}分${sec}秒`,
+      }),
+    ])
     navigate('/dashboard')
   }
   // ──────────────────────────────────────────────────────────────────────────
+
+  // ─── calling フェーズ画面 ─────────────────────────────────────────────────
+  if (phase === 'calling') {
+    const elMM = String(Math.floor(elapsed / 60)).padStart(2, '0')
+    const elSS = String(elapsed % 60).padStart(2, '0')
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-6" style={{ backgroundColor: '#F5F0E8' }}>
+        <div className="bg-white rounded-3xl p-10 shadow-lg text-center w-full max-w-sm">
+          <div className="text-6xl mb-5 animate-pulse">📞</div>
+          <h2 className="text-xl font-bold text-gray-800 mb-1">主任へ電話連絡中...</h2>
+          <p className="text-sm text-gray-500 mb-1">
+            {form.assignee || '担当者'} に連絡してください
+          </p>
+          <p className="text-xs text-gray-400 mb-8">連絡が完了したら下のボタンを押してください</p>
+          <div className="text-6xl font-black tabular-nums font-mono text-emerald-700 mb-10 tracking-wider">
+            {elMM}:{elSS}
+          </div>
+          <button
+            onClick={handleCallComplete}
+            className="w-full h-14 rounded-2xl bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white text-lg font-bold transition-colors shadow-sm">
+            ✓ 連絡完了
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   // 時刻・日付フォーマット
   const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' })

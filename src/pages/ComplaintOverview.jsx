@@ -302,9 +302,19 @@ export default function ComplaintOverview() {
           <span>担当：<strong className="text-gray-700">{complaint.assignee || '—'}</strong></span>
           <span>現場作業者：<strong className="text-gray-700">{complaint.worker_name || '—'}</strong></span>
           <span>作業日：<strong className="text-gray-700">{complaint.work_date || '—'}</strong></span>
-          <span>受付：{fmtDateTime(complaint.received_at)}</span>
-          {complaint.call_completed_at && (
-            <span>主任引継：<strong className="text-gray-700">{fmtDateTime(complaint.call_completed_at)}</strong></span>
+          {complaint.call_completed_at ? (() => {
+            const diffSec = Math.floor((new Date(complaint.call_completed_at) - new Date(complaint.received_at)) / 1000)
+            const elapsed = diffSec < 60 ? `${diffSec}秒後` : `${Math.floor(diffSec / 60)}分後`
+            return (
+              <span className="col-span-2">
+                受付 {fmtDateTime(complaint.received_at)}
+                <span className="mx-1 text-gray-400">→</span>
+                主任引継 <strong className="text-gray-700">{fmtDateTime(complaint.call_completed_at)}</strong>
+                <span className="ml-1 text-emerald-600 font-semibold">（{elapsed}）</span>
+              </span>
+            )
+          })() : (
+            <span>受付：{fmtDateTime(complaint.received_at)}</span>
           )}
           <span>ステータス：<strong className="text-gray-700">{complaint.status.replace('是正案', '対応案')}</strong></span>
         </div>

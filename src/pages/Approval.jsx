@@ -115,7 +115,6 @@ export default function Approval() {
   const [currentUser,        setCurrentUser]        = useState(null)
   const [rejectModalOpen,    setRejectModalOpen]    = useState(false)
   const [rejectTarget,       setRejectTarget]       = useState(null)
-  const [rejectType,         setRejectType]         = useState(null)
 
   useEffect(() => {
     const t = setInterval(() => setTick(n => n + 1), 1000)
@@ -165,7 +164,7 @@ export default function Approval() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  const handleApproval = async (approvalId, status) => {
+  const handleApproval = async (approvalId, status, type = null) => {
     setSaving(s => ({ ...s, [approvalId]: true }))
     await supabase.from('complaint_approvals').update({
       status,
@@ -179,13 +178,12 @@ export default function Approval() {
 
     // 否認時は complaint を差し戻しに
     if (status === 'rejected') {
-      const nextStatus = rejectType === 'report' ? 'report_rejected' : '役員再協議'
+      const nextStatus = type === 'report' ? 'report_rejected' : '役員再協議'
       await supabase.from('complaints').update({
         status: nextStatus, current_turn_started_at: new Date().toISOString(),
       }).eq('id', id)
       setComplaint(c => ({ ...c, status: nextStatus }))
       setRejectModalOpen(false)
-      setRejectType(null)
       setRejectTarget(null)
     }
 
@@ -549,13 +547,13 @@ export default function Approval() {
           <div className="bg-white rounded-2xl p-6 w-80 space-y-4 shadow-xl">
             <p className="font-bold text-gray-800 text-center">差し戻し先を選択してください</p>
             <button
-              onClick={() => { setRejectType('deep_analysis'); handleApproval(rejectTarget, 'rejected') }}
+              onClick={() => handleApproval(rejectTarget, 'rejected', 'deep_analysis')}
               className="w-full py-3 rounded-xl bg-stone-100 hover:bg-stone-200 text-sm font-bold text-gray-700 transition-colors"
             >
               深掘り分析に戻す
             </button>
             <button
-              onClick={() => { setRejectType('report'); handleApproval(rejectTarget, 'rejected') }}
+              onClick={() => handleApproval(rejectTarget, 'rejected', 'report')}
               className="w-full py-3 rounded-xl bg-red-50 hover:bg-red-100 text-sm font-bold text-red-700 transition-colors"
             >
               改善報告書に戻す

@@ -55,6 +55,11 @@ const STATUS_BADGE = {
   '承認完了':       'bg-emerald-100 text-emerald-700 border border-emerald-200',
 }
 
+const STATUS_LABEL = {
+  'correction_rejected': '報告書差し戻し',
+  'report_rejected':     '報告書差し戻し',
+}
+
 const TAG_COLOR = {
   '遅刻':         'bg-blue-50 text-blue-700',
   'その他':       'bg-stone-100 text-stone-600',
@@ -280,7 +285,7 @@ function ComplaintCard({ c, onClick, firstContactMin, role }) {
             <div className="h-9" />
           )}
           <span className={cn('text-xs font-semibold px-3 py-1 rounded-full', STATUS_BADGE[c.status] ?? 'bg-stone-100 text-stone-600')}>
-            {c.status.replace('是正案', '対応案')}
+            {STATUS_LABEL[c.status] ?? c.status.replace('是正案', '対応案')}
           </span>
           {firstContactMin != null && (
             <span className="text-xs text-gray-500">初回連絡: {firstContactMin}分</span>
@@ -326,7 +331,7 @@ function StatusComplaintCard({ c, onClick, role }) {
           </div>
         </div>
         <span className={cn('text-xs font-semibold px-3 py-1 rounded-full shrink-0', STATUS_BADGE[c.status] ?? 'bg-stone-100 text-stone-600 border border-stone-200')}>
-          {c.status.replace('是正案', '対応案')}
+          {STATUS_LABEL[c.status] ?? c.status.replace('是正案', '対応案')}
         </span>
       </div>
 

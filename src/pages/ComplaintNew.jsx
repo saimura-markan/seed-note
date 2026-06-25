@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 
 // ─── 定数 ────────────────────────────────────────────────────────────────────
 
-const CATEGORIES = ['破損', '施工不備', '遅刻', 'マナー', '近隣トラブル', 'その他']
+const CATEGORIES = ['破損', '施工不備', '遅刻', 'マナー', '事故', '近隣トラブル', 'その他']
 
 const EMOTION_LEVELS = [
   { level: 1, label: '穏やか',       deadline: 60 },
@@ -393,7 +393,7 @@ export default function ComplaintNew() {
                   Lv.{form.emotionLevel}「{deadlineCfg.label}」→ {deadlineCfg.deadline}分以内
                 </span>
               </div>
-              {form.emotionLevel >= 3 && (
+              {(
                 <div className="mt-2 flex flex-col items-start leading-none">
                   <span className={cn('text-3xl font-black tabular-nums', deadlineText[form.emotionLevel])}>
                     {deadlineCfg.deadline}

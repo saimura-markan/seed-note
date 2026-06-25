@@ -595,7 +595,7 @@ export default function ComplaintOverview() {
               <div className={cn('w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold', correction ? 'bg-emerald-500 text-white' : 'bg-stone-200 text-stone-500')}>5</div>
               <span className="text-sm font-bold text-gray-800">改善報告書（現象原因の特定）</span>
             </div>
-            {complaint.status === 'correction_rejected'
+            {['correction_rejected', 'report_rejected'].includes(complaint.status)
               ? <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-100 text-red-700">否認・修正待ち</span>
               : <span className={cn('text-xs font-bold px-2.5 py-1 rounded-full', correction ? 'bg-emerald-100 text-emerald-700' : 'text-stone-400')}>{correction ? '提出済' : '未記録'}</span>
             }
@@ -634,6 +634,20 @@ export default function ComplaintOverview() {
             </div>
           )}
           {complaint.status === 'correction_rejected' && ['admin', 'manager'].includes(userRole) && (
+            <div className="mx-5 mb-4">
+              <button onClick={() => navigate(`/complaints/${id}/correction`)}
+                className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold transition-colors">
+                改善報告書を修正する →
+              </button>
+            </div>
+          )}
+          {complaint.status === 'report_rejected' && (
+            <div className="mx-5 mb-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+              <p className="text-xs font-semibold text-red-700 mb-1">⚠️ 役員から改善報告書の差し戻しがありました</p>
+              <p className="text-sm text-gray-500">内容を修正して再提出してください。</p>
+            </div>
+          )}
+          {complaint.status === 'report_rejected' && ['admin', 'manager'].includes(userRole) && (
             <div className="mx-5 mb-4">
               <button onClick={() => navigate(`/complaints/${id}/correction`)}
                 className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold transition-colors">

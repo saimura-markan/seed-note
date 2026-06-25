@@ -641,12 +641,22 @@ export default function ComplaintOverview() {
               </button>
             </div>
           )}
-          {complaint.status === 'report_rejected' && (
-            <div className="mx-5 mb-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-              <p className="text-xs font-semibold text-red-700 mb-1">⚠️ 役員から改善報告書の差し戻しがありました</p>
-              <p className="text-sm text-gray-500">内容を修正して再提出してください。</p>
-            </div>
-          )}
+          {complaint.status === 'report_rejected' && (() => {
+            const rejectedApproval = approvals.find(a => a.status === 'rejected')
+            return (
+              <div className="mx-5 mb-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                <p className="text-xs font-semibold text-red-700 mb-2">
+                  ⚠️ {rejectedApproval ? `${rejectedApproval.approver_name}より差し戻しがありました` : '役員から改善報告書の差し戻しがありました'}
+                </p>
+                {rejectedApproval?.comment && (
+                  <p className="text-sm text-gray-700 bg-white rounded-lg px-3 py-2 mb-2 border border-red-100">
+                    コメント：「{rejectedApproval.comment}」
+                  </p>
+                )}
+                <p className="text-sm text-gray-500">内容を修正して再提出してください。</p>
+              </div>
+            )
+          })()}
           {complaint.status === 'report_rejected' && ['admin', 'manager'].includes(userRole) && (
             <div className="mx-5 mb-4">
               <button onClick={() => navigate(`/complaints/${id}/correction`)}

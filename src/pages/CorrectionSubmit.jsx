@@ -138,7 +138,7 @@ export default function CorrectionSubmit() {
     } else {
       await supabase.from('complaint_corrections').insert(payload)
     }
-    const nextStatus = ['是正案承認', 'correction_rejected'].includes(complaint?.status) ? '改善報告書提出' : '是正案提出'
+    const nextStatus = ['是正案承認', 'correction_rejected', 'report_rejected'].includes(complaint?.status) ? '改善報告書提出' : '是正案提出'
     await supabase.from('complaints').update({ status: nextStatus, current_turn_started_at: new Date().toISOString() }).eq('id', id)
     setSubmitting(false)
     navigate(`/complaints/${id}`)

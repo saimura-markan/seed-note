@@ -113,6 +113,9 @@ export default function Approval() {
   const [negotiationReplies, setNegotiationReplies] = useState([])
   const [loading,            setLoading]            = useState(true)
   const [currentUser,        setCurrentUser]        = useState(null)
+  const [rejectModalOpen,    setRejectModalOpen]    = useState(false)
+  const [rejectTarget,       setRejectTarget]       = useState(null)
+  const [rejectType,         setRejectType]         = useState(null)
 
   useEffect(() => {
     const t = setInterval(() => setTick(n => n + 1), 1000)
@@ -176,10 +179,14 @@ export default function Approval() {
 
     // 否認時は complaint を差し戻しに
     if (status === 'rejected') {
+      const nextStatus = rejectType === 'report' ? 'report_rejected' : '役員再協議'
       await supabase.from('complaints').update({
-        status: '役員再協議', current_turn_started_at: new Date().toISOString(),
+        status: nextStatus, current_turn_started_at: new Date().toISOString(),
       }).eq('id', id)
-      setComplaint(c => ({ ...c, status: '役員再協議' }))
+      setComplaint(c => ({ ...c, status: nextStatus }))
+      setRejectModalOpen(false)
+      setRejectType(null)
+      setRejectTarget(null)
     }
 
     // 全員承認済みなら complaint を完了に
@@ -481,7 +488,7 @@ export default function Approval() {
                         {saving[appr.id] ? '処理中...' : '承認する'}
                       </button>
                       <button
-                        onClick={() => handleApproval(appr.id, 'rejected')}
+                        onClick={() => { setRejectTarget(appr.id); setRejectModalOpen(true) }}
                         disabled={saving[appr.id]}
                         className="flex-1 h-10 rounded-xl border-2 border-red-200 text-red-700 bg-red-50 hover:bg-red-100 text-sm font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5">
                         <XCircle size={14} />
@@ -534,6 +541,32 @@ export default function Approval() {
             className="px-6 py-2.5 rounded-xl bg-emerald-700 text-white text-sm font-bold hover:bg-emerald-800 transition-colors">
             ダッシュボードへ戻る
           </button>
+        </div>
+      )}
+
+      {rejectModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-80 space-y-4 shadow-xl">
+            <p className="font-bold text-gray-800 text-center">差し戻し先を選択してください</p>
+            <button
+              onClick={() => { setRejectType('deep_analysis'); handleApproval(rejectTarget, 'rejected') }}
+              className="w-full py-3 rounded-xl bg-stone-100 hover:bg-stone-200 text-sm font-bold text-gray-700 transition-colors"
+            >
+              深掘り分析に戻す
+            </button>
+            <button
+              onClick={() => { setRejectType('report'); handleApproval(rejectTarget, 'rejected') }}
+              className="w-full py-3 rounded-xl bg-red-50 hover:bg-red-100 text-sm font-bold text-red-700 transition-colors"
+            >
+              改善報告書に戻す
+            </button>
+            <button
+              onClick={() => { setRejectModalOpen(false); setRejectTarget(null) }}
+              className="w-full py-2 text-xs text-gray-400 hover:text-gray-600"
+            >
+              キャンセル
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -11,7 +11,7 @@ function statusToStep(status) {
     '受付済': 0,
     '対応中': 1,
     '是正案提出': 2, '是正案差し戻し': 2, '是正案再提出': 2, '是正案承認': 2,
-    '改善報告書提出': 3, 'correction_rejected': 3,
+    '改善報告書提出': 3, 'correction_rejected': 3, 'report_rejected': 3,
     '深掘り提出': 5, '役員再協議': 5,
     '承認完了': 6,
   }
@@ -260,8 +260,8 @@ export default function ComplaintOverview() {
   const approvedCount = approvals.filter(a => a.status === 'approved').length
   const supervisorConfirmed = supervisorCommentLogs.length > 0 || !!complaint.supervisor_comment
 
-  const PAST_STEP4 = ['是正案提出', '是正案差し戻し', '是正案再提出', '是正案承認', '改善報告書提出', 'correction_rejected', '深掘り提出', '承認完了']
-  const PAST_STEP5 = ['是正案承認', '改善報告書提出', 'correction_rejected', '深掘り提出', '承認完了']
+  const PAST_STEP4 = ['是正案提出', '是正案差し戻し', '是正案再提出', '是正案承認', '改善報告書提出', 'correction_rejected', 'report_rejected', '深掘り提出', '承認完了']
+  const PAST_STEP5 = ['是正案承認', '改善報告書提出', 'correction_rejected', 'report_rejected', '深掘り提出', '承認完了']
   const PAST_STEP6 = ['改善報告書提出', '深掘り提出', '役員再協議', '承認完了']
   const step2Locked = contactLogs.length === 0
   const step3Locked = !hasHearing

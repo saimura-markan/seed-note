@@ -12,28 +12,45 @@ const BULLETIN_PERIODS = [
   { id: '1y',  label: '1年以内' },
 ]
 
+function SectionBlock({ num, icon, title, headerCls, numCls, children }) {
+  return (
+    <div className="rounded-xl overflow-hidden border border-stone-100 shadow-sm">
+      <div className={cn('flex items-center gap-2.5 px-4 py-2.5 border-b border-stone-100', headerCls)}>
+        <span className={cn('w-5 h-5 rounded-full text-white text-[10px] font-black flex items-center justify-center flex-shrink-0', numCls)}>
+          {num}
+        </span>
+        <span className="text-base leading-none">{icon}</span>
+        <span className="text-sm font-bold text-gray-700">{title}</span>
+      </div>
+      <div className="px-4 py-3">
+        {children}
+      </div>
+    </div>
+  )
+}
+
 function BulletinCard({ post }) {
   const c          = post.content   || {}
   const deep       = post.deep      || {}
   const rejections = post.rejections || []
   const negReplies = post.negReplies || []
+
   const date = post.created_at
     ? new Date(post.created_at).toLocaleDateString('ja-JP', { year: 'numeric', month: 'numeric', day: 'numeric' })
     : '—'
-  const contactCount = Array.isArray(c.contact_logs) ? c.contact_logs.length : 0
 
-  // deep analysis フィールドは complaint_deep_analysis を優先、content をフォールバック
-  const rootCause   = deep.root_cause   || c.root_cause   || ''
-  const rootTheme   = deep.root_theme   || c.root_theme   || ''
-  const rootDetail  = deep.root_detail  || c.root_detail  || ''
-  const orgImprove  = deep.org_improvement || c.org_improvement || ''
-  const horizDepts  = Array.isArray(deep.horizontal_departments) ? deep.horizontal_departments
-                    : Array.isArray(c.horizontal_departments)    ? c.horizontal_departments
-                    : []
-  const horizContent   = deep.horizontal_content  || c.horizontal_content  || ''
-  const actionAssignee = deep.action_assignee     || c.action_assignee     || ''
-  const actionDeadline = deep.action_deadline     || c.action_deadline     || ''
-  const actionProgress = deep.action_progress     || c.action_progress     || ''
+  const contactLogs = Array.isArray(c.contact_logs) ? c.contact_logs : []
+
+  const rootCause      = deep.root_cause        || c.root_cause        || ''
+  const rootTheme      = deep.root_theme         || c.root_theme         || ''
+  const rootDetail     = deep.root_detail        || c.root_detail        || ''
+  const orgImprove     = deep.org_improvement    || c.org_improvement    || ''
+  const horizDepts     = Array.isArray(deep.horizontal_departments) ? deep.horizontal_departments
+                       : Array.isArray(c.horizontal_departments)    ? c.horizontal_departments : []
+  const horizContent   = deep.horizontal_content || c.horizontal_content || ''
+  const actionAssignee = deep.action_assignee    || c.action_assignee    || ''
+  const actionDeadline = deep.action_deadline    || c.action_deadline    || ''
+  const actionProgress = deep.action_progress    || c.action_progress    || ''
 
   const progressBadge =
     actionProgress === '完了'   ? 'bg-emerald-100 text-emerald-700' :
@@ -41,105 +58,172 @@ function BulletinCard({ post }) {
                                   'bg-stone-100 text-stone-600'
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border-l-4 border-l-emerald-400 overflow-hidden">
-      <div className="px-5 py-3 bg-emerald-50 border-b border-emerald-100 flex items-center gap-3 flex-wrap">
-        <span className="text-sm font-bold text-emerald-800">🌱 改善報告書</span>
-        <span className="text-xs text-gray-400">{date}</span>
-        {c.site_name && <span className="text-xs text-gray-600">現場：<strong>{c.site_name}</strong></span>}
-        {c.assignee  && <span className="text-xs text-gray-600">担当：<strong>{c.assignee}</strong></span>}
+    <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
+
+      {/* カードヘッダー */}
+      <div className="px-5 py-3.5 bg-gradient-to-r from-emerald-700 to-emerald-500 flex items-center gap-3 flex-wrap">
+        <span className="text-sm font-bold text-white">🌱 改善報告書</span>
+        <span className="text-xs text-emerald-200">{date}</span>
+        {c.site_name && (
+          <span className="text-xs bg-white/20 text-white font-medium px-2.5 py-0.5 rounded-full">
+            📍 {c.site_name}
+          </span>
+        )}
+        {c.assignee && (
+          <span className="text-xs text-emerald-200 ml-auto">担当：{c.assignee}</span>
+        )}
       </div>
-      <div className="px-5 py-4 space-y-4">
-        {c.description && (
-          <div>
-            <p className="text-[11px] font-bold text-gray-400 mb-1">■ クレーム内容</p>
-            <p className="text-sm text-gray-700 leading-relaxed">{c.description}</p>
-          </div>
-        )}
-        <div>
-          <p className="text-[11px] font-bold text-gray-400 mb-1">■ 対応の顛末</p>
-          <p className="text-sm text-gray-700 leading-relaxed">
-            連絡{contactCount}件
-            {c.hearing           && `　聞き取り：${c.hearing}`}
-            {c.correction_action && `　現場対応：${c.correction_action}`}
-          </p>
-        </div>
-        {c.direct_cause && (
-          <div>
-            <p className="text-[11px] font-bold text-gray-400 mb-1">■ 現象原因</p>
-            <p className="text-sm text-gray-700 leading-relaxed">{c.direct_cause}</p>
-          </div>
-        )}
-        {c.improvement && (
-          <div style={{ borderLeft: '4px solid #60a5fa', backgroundColor: '#eff6ff', borderRadius: '0 12px 12px 0', padding: '12px 16px' }}>
-            <p style={{ fontSize: '12px', fontWeight: 700, color: '#1d4ed8', marginBottom: '6px' }}>🔧 現象対策（現場で考えた対策案）</p>
-            <p className="text-sm text-gray-700 leading-relaxed">{c.improvement}</p>
-          </div>
-        )}
-        {(rootCause || rootTheme || rootDetail) && (
-          <div>
-            <p className="text-[11px] font-bold text-gray-400 mb-1">■ 真因分析</p>
-            {rootTheme && (
-              <span className="inline-block mb-1.5 text-xs font-semibold bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded-full">
-                カテゴリー：{rootTheme}
-              </span>
-            )}
-            {rootCause && <p className="text-sm text-gray-700 leading-relaxed">{rootCause}</p>}
-            {rootDetail && (
-              <p className="text-xs text-gray-500 leading-relaxed mt-1 bg-stone-50 rounded-lg px-3 py-2">{rootDetail}</p>
-            )}
-          </div>
-        )}
-        {(horizDepts.length > 0 || horizContent) && (
-          <div>
-            <p className="text-[11px] font-bold text-gray-400 mb-1">■ 横展開</p>
-            {horizDepts.length > 0 && (
-              <p className="text-xs text-gray-600 mb-1">
-                対象部署：<strong className="text-gray-800">{horizDepts.join('・')}</strong>
-              </p>
-            )}
-            {horizContent && <p className="text-sm text-gray-700 leading-relaxed">{horizContent}</p>}
-          </div>
-        )}
-        {(orgImprove || actionAssignee || actionDeadline) && (
-          <div style={{ borderLeft: '4px solid #f97316', backgroundColor: '#fff7ed', borderRadius: '0 12px 12px 0', padding: '12px 16px' }}>
-            <p style={{ fontSize: '12px', fontWeight: 700, color: '#c2410c', marginBottom: '6px' }}>🏢 組織改善策（再発防止）</p>
-            {orgImprove && (
-              <p className="text-sm text-gray-700 leading-relaxed mb-2">{orgImprove}</p>
-            )}
-            <div className="flex items-center gap-3 flex-wrap text-xs">
-              {actionAssignee && (
-                <span className="text-gray-600">担当：<strong className="text-gray-800">{actionAssignee}</strong></span>
-              )}
-              {actionDeadline && (
-                <span className="text-gray-600">期限：<strong className="text-gray-800">{actionDeadline}</strong></span>
-              )}
-              {actionProgress && (
-                <span className={cn('font-bold px-2.5 py-0.5 rounded-full', progressBadge)}>
-                  {actionProgress}
-                </span>
+
+      <div className="p-4 space-y-3">
+
+        {/* ① 受付内容 */}
+        <SectionBlock num="1" icon="📋" title="受付内容" headerCls="bg-stone-50" numCls="bg-stone-500">
+          {c.description
+            ? <p className="text-sm text-gray-800 leading-relaxed">{c.description}</p>
+            : <p className="text-sm text-gray-400 italic">記録なし</p>
+          }
+        </SectionBlock>
+
+        {/* ② お客様対応記録 */}
+        <SectionBlock
+          num="2" icon="📞" title={`お客様対応記録${contactLogs.length > 0 ? `（連絡 ${contactLogs.length}件）` : ''}`}
+          headerCls="bg-sky-50" numCls="bg-sky-500"
+        >
+          {contactLogs.length > 0 ? (
+            <div className="space-y-2">
+              {contactLogs.map((log, i) => (
+                <div key={i} className="flex gap-2.5 items-start">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-sky-100 text-sky-600 text-[10px] font-bold flex items-center justify-center mt-0.5">
+                    {i + 1}
+                  </span>
+                  <p className="text-sm text-gray-700 leading-relaxed">{log.content}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 italic">記録なし</p>
+          )}
+        </SectionBlock>
+
+        {/* ③ 現場状況 */}
+        <SectionBlock num="3" icon="🏗️" title="現場状況（現場責任者からの聞き取り）" headerCls="bg-amber-50" numCls="bg-amber-500">
+          {c.hearing
+            ? <p className="text-sm text-gray-800 leading-relaxed">{c.hearing}</p>
+            : <p className="text-sm text-gray-400 italic">記録なし</p>
+          }
+        </SectionBlock>
+
+        {/* ④ 現場対応 */}
+        <SectionBlock num="4" icon="🔧" title="現場対応" headerCls="bg-teal-50" numCls="bg-teal-500">
+          {c.correction_action
+            ? <p className="text-sm text-gray-800 leading-relaxed">{c.correction_action}</p>
+            : <p className="text-sm text-gray-400 italic">記録なし</p>
+          }
+        </SectionBlock>
+
+        {/* ⑤ 原因分析 */}
+        <SectionBlock num="5" icon="🔍" title="原因分析（今回のクレームが起きた原因）" headerCls="bg-rose-50" numCls="bg-rose-500">
+          {c.direct_cause
+            ? <p className="text-sm text-gray-800 leading-relaxed">{c.direct_cause}</p>
+            : <p className="text-sm text-gray-400 italic">記録なし</p>
+          }
+        </SectionBlock>
+
+        {/* ⑥ 現象対策 */}
+        <SectionBlock num="6" icon="💡" title="現象対策（現場で考えた対策案）" headerCls="bg-blue-50" numCls="bg-blue-500">
+          {c.improvement
+            ? <p className="text-sm text-gray-800 leading-relaxed">{c.improvement}</p>
+            : <p className="text-sm text-gray-400 italic">記録なし</p>
+          }
+        </SectionBlock>
+
+        {/* ⑦ 組織改善策 */}
+        <SectionBlock num="7" icon="🏢" title="組織改善策（再発防止）" headerCls="bg-orange-50" numCls="bg-orange-500">
+          {orgImprove || actionAssignee || actionDeadline || actionProgress ? (
+            <div className="space-y-2">
+              {orgImprove && <p className="text-sm text-gray-800 leading-relaxed">{orgImprove}</p>}
+              {(actionAssignee || actionDeadline || actionProgress) && (
+                <div className="flex items-center gap-3 flex-wrap pt-1 border-t border-orange-100 mt-2">
+                  {actionAssignee && (
+                    <span className="text-xs text-gray-500">担当：<strong className="text-gray-800">{actionAssignee}</strong></span>
+                  )}
+                  {actionDeadline && (
+                    <span className="text-xs text-gray-500">期限：<strong className="text-gray-800">{actionDeadline}</strong></span>
+                  )}
+                  {actionProgress && (
+                    <span className={cn('text-xs font-bold px-2.5 py-0.5 rounded-full', progressBadge)}>
+                      {actionProgress}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
-          </div>
-        )}
-        {rejections.length > 0 && (
-          <div>
-            <p className="text-[11px] font-bold text-gray-400 mb-2">■ 役員からの指摘・最終対策</p>
-            <div className="space-y-1.5">
+          ) : (
+            <p className="text-sm text-gray-400 italic">記録なし</p>
+          )}
+        </SectionBlock>
+
+        {/* ⑧ 真因分析結果 */}
+        <SectionBlock num="8" icon="🧠" title="真因分析結果" headerCls="bg-violet-50" numCls="bg-violet-500">
+          {rootCause || rootTheme || rootDetail ? (
+            <div className="space-y-2">
+              {rootTheme && (
+                <span className="inline-block text-xs font-semibold bg-violet-100 text-violet-700 px-2.5 py-0.5 rounded-full">
+                  カテゴリー：{rootTheme}
+                </span>
+              )}
+              {rootCause && <p className="text-sm text-gray-800 leading-relaxed">{rootCause}</p>}
+              {rootDetail && (
+                <p className="text-xs text-gray-600 leading-relaxed bg-violet-50 rounded-lg px-3 py-2">{rootDetail}</p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 italic">記録なし</p>
+          )}
+        </SectionBlock>
+
+        {/* ⑨ 横展開 */}
+        <SectionBlock num="9" icon="🌐" title="横展開" headerCls="bg-emerald-50" numCls="bg-emerald-500">
+          {horizDepts.length > 0 || horizContent ? (
+            <div className="space-y-2">
+              {horizDepts.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {horizDepts.map(d => (
+                    <span key={d} className="text-xs font-medium bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded-full">{d}</span>
+                  ))}
+                </div>
+              )}
+              {horizContent && <p className="text-sm text-gray-800 leading-relaxed">{horizContent}</p>}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 italic">記録なし</p>
+          )}
+        </SectionBlock>
+
+        {/* 役員指摘・最終対策（あれば） */}
+        {(rejections.length > 0 || negReplies.length > 0) && (
+          <div className="rounded-xl overflow-hidden border border-amber-200 shadow-sm">
+            <div className="flex items-center gap-2.5 px-4 py-2.5 bg-amber-50 border-b border-amber-100">
+              <span className="text-base leading-none">⚠️</span>
+              <span className="text-sm font-bold text-amber-800">役員指摘・最終対策</span>
+            </div>
+            <div className="px-4 py-3 space-y-2">
               {rejections.map((a, i) => (
-                <div key={i} className="border-l-2 border-amber-400 bg-amber-50 rounded-r-lg px-3 py-2 text-sm">
+                <div key={i} className="border-l-4 border-amber-400 bg-amber-50 rounded-r-xl px-3 py-2">
                   <p className="text-[10px] font-bold text-amber-600 mb-0.5">役員指摘（{a.approver_name}）</p>
-                  <p className="text-gray-700">{a.comment}</p>
+                  <p className="text-sm text-gray-700">{a.comment}</p>
                 </div>
               ))}
               {negReplies.map((r, i) => (
-                <div key={i} className="border-l-2 border-emerald-500 bg-emerald-50 rounded-r-lg px-3 py-2 text-sm">
+                <div key={i} className="border-l-4 border-emerald-500 bg-emerald-50 rounded-r-xl px-3 py-2">
                   <p className="text-[10px] font-bold text-emerald-600 mb-0.5">→ 対応（事業責任者）</p>
-                  <p className="text-gray-700">{r.content}</p>
+                  <p className="text-sm text-gray-700">{r.content}</p>
                 </div>
               ))}
             </div>
           </div>
         )}
+
       </div>
     </div>
   )

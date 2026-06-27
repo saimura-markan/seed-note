@@ -105,6 +105,7 @@ export default function Approval() {
   const [correction,            setCorrection]            = useState(null)
   const [contactLogs,           setContactLogs]           = useState([])
   const [hearingText,           setHearingText]           = useState('')
+  const [hearingLog,            setHearingLog]            = useState(null)
   const [supervisorCommentLogs, setSupervisorCommentLogs] = useState([])
 
   const [comments,           setComments]           = useState({})
@@ -152,7 +153,7 @@ export default function Approval() {
     if (logs) {
       setContactLogs(logs.filter(l => l.type === 'contact'))
       const h = logs.filter(l => l.type === 'hearing').pop()
-      if (h) setHearingText(h.content)
+      if (h) { setHearingText(h.content); setHearingLog(h) }
       setSupervisorCommentLogs(logs.filter(l => l.type === 'supervisor_comment'))
       const snapLog = logs.filter(l => l.type === 'deep_revision_snapshot').pop()
       if (snapLog) { try { setRevisionSnapshot(JSON.parse(snapLog.content)) } catch {} }
@@ -206,9 +207,17 @@ export default function Approval() {
             description:            complaint.content,
             received_at:            complaint.received_at || complaint.created_at,
             assignee:               complaint.assignee,
-            contact_logs:           contactLogs.map(l => ({ content: l.content, created_at: l.created_at })),
+            contact_logs:           contactLogs.map(l => ({
+              content:           l.content,
+              created_at:        l.created_at,
+              connected_attempt: l.connected_attempt ?? null,
+              missed_calls:      l.missed_calls ?? null,
+            })),
             hearing:                hearingText,
+            hearing_at:             hearingLog?.created_at ?? null,
             correction_action:      correction?.correction,
+            correction_author:      correction?.author_name || complaint.assignee || null,
+            correction_created_at:  correction?.created_at ?? null,
             direct_cause:           correction?.direct_cause,
             improvement:            correction?.improvement,
             root_cause:             analysis?.root_cause,
@@ -220,6 +229,9 @@ export default function Approval() {
             action_progress:        analysis?.action_progress,
             horizontal_departments: analysis?.horizontal_departments,
             horizontal_content:     analysis?.horizontal_content,
+            deep_author:            analysis?.author_name ?? null,
+            deep_created_at:        analysis?.created_at ?? null,
+            approved_at:            new Date().toISOString(),
           },
         })
       }

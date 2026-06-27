@@ -53,7 +53,8 @@ export default function DeepAnalysisForm() {
   const [actionDeadline, setActionDeadline] = useState('')
   const [actionProgress, setActionProgress] = useState('未着手')
   const [submitting,     setSubmitting]     = useState(false)
-  const [loading,    setLoading]    = useState(true)
+  const [loading,        setLoading]        = useState(true)
+  const [currentUser,    setCurrentUser]    = useState(null)
   const [, setTick]                 = useState(0)
 
   // ソクラテス対話（真因）
@@ -162,6 +163,12 @@ export default function DeepAnalysisForm() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setCurrentUser(data.session?.user ?? null)
+    })
+  }, [])
+
   // ── 対応案 承認 ──
   const handleApprove = async () => {
     setApproving(true)
@@ -225,6 +232,7 @@ export default function DeepAnalysisForm() {
       root_cause: rootCause, org_improvement: orgImprove, root_theme: rootTheme, root_detail: rootDetail,
       horizontal_departments: horizDepts, horizontal_content: horizContent,
       action_assignee: actionAssignee, action_deadline: actionDeadline || null, action_progress: actionProgress,
+      author_name: currentUser?.user_metadata?.full_name || currentUser?.user_metadata?.name || null,
     }
     if (existing) {
       if (complaint.status === '役員再協議') {

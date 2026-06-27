@@ -12,15 +12,46 @@ const BULLETIN_PERIODS = [
   { id: '1y',  label: '1年以内' },
 ]
 
-function SectionBlock({ num, icon, title, headerCls, numCls, children }) {
+function fmtShort(iso) {
+  if (!iso) return null
+  return new Date(iso).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+function calcElapsedLabel(startIso, endIso) {
+  if (!startIso || !endIso) return null
+  const diffMs = new Date(endIso) - new Date(startIso)
+  if (diffMs < 0) return null
+  const totalMin = Math.floor(diffMs / 60000)
+  if (totalMin < 60) return `${totalMin}分`
+  const h = Math.floor(totalMin / 60)
+  const m = totalMin % 60
+  if (h < 24) return m > 0 ? `${h}時間${m}分` : `${h}時間`
+  const d = Math.floor(h / 24)
+  const rh = h % 24
+  return rh > 0 ? `${d}日${rh}時間` : `${d}日`
+}
+
+function SectionBlock({ num, icon, title, headerCls, numCls, author, dateStr, elapsed, overdue, children }) {
   return (
     <div className="rounded-xl overflow-hidden border border-stone-100 shadow-sm">
-      <div className={cn('flex items-center gap-2.5 px-4 py-2.5 border-b border-stone-100', headerCls)}>
+      <div className={cn('flex items-center gap-2 px-4 py-2.5 border-b border-stone-100', headerCls)}>
         <span className={cn('w-5 h-5 rounded-full text-white text-[10px] font-black flex items-center justify-center flex-shrink-0', numCls)}>
           {num}
         </span>
         <span className="text-base leading-none">{icon}</span>
         <span className="text-sm font-bold text-gray-700">{title}</span>
+        <div className="flex items-center gap-2 ml-auto flex-wrap justify-end">
+          {author && <span className="text-xs text-gray-500 font-medium">{author}</span>}
+          {dateStr && <span className="text-xs text-gray-400">{dateStr}</span>}
+          {elapsed && (
+            <span className={cn(
+              'text-xs font-semibold px-2 py-0.5 rounded-full',
+              overdue ? 'bg-red-100 text-red-600' : 'bg-stone-100 text-stone-500'
+            )}>
+              ⏱ {elapsed}{overdue ? ' 超過' : ''}
+            </span>
+          )}
+        </div>
       </div>
       <div className="px-4 py-3">
         {children}
@@ -41,6 +72,7 @@ function BulletinCard({ post }) {
 
   const contactLogs = Array.isArray(c.contact_logs) ? c.contact_logs : []
 
+  // deep analysis フィールドは complaint_deep_analysis を優先
   const rootCause      = deep.root_cause        || c.root_cause        || ''
   const rootTheme      = deep.root_theme         || c.root_theme         || ''
   const rootDetail     = deep.root_detail        || c.root_detail        || ''
@@ -51,11 +83,31 @@ function BulletinCard({ post }) {
   const actionAssignee = deep.action_assignee    || c.action_assignee    || ''
   const actionDeadline = deep.action_deadline    || c.action_deadline    || ''
   const actionProgress = deep.action_progress    || c.action_progress    || ''
+  const deepAuthor     = deep.author_name        || c.deep_author        || ''
+  const deepCreatedAt  = deep.created_at         || c.deep_created_at    || ''
+  const corrAuthor     = c.correction_author || c.assignee || ''
+  const corrCreatedAt  = c.correction_created_at || ''
+
+  // 所要時間
+  const firstContactAt   = contactLogs[0]?.created_at || null
+  const elapsedToContact = calcElapsedLabel(c.received_at, firstContactAt)
+  const elapsedToHearing = calcElapsedLabel(c.received_at, c.hearing_at)
+  const elapsedToCorr    = calcElapsedLabel(c.received_at, corrCreatedAt)
+  const elapsedToDeep    = calcElapsedLabel(corrCreatedAt, deepCreatedAt)
+
+  // 組織改善策の期限超過チェック
+  const actionOverdue = actionDeadline && actionProgress !== '完了'
+    && new Date() > new Date(actionDeadline)
 
   const progressBadge =
     actionProgress === '完了'   ? 'bg-emerald-100 text-emerald-700' :
     actionProgress === '進行中' ? 'bg-blue-100 text-blue-700'       :
                                   'bg-stone-100 text-stone-600'
+
+  // お客様対応記録のサマリー
+  const missedCount    = contactLogs.filter(l => l.content === '繋がらず').length
+  const connectedLog   = contactLogs.find(l => l.content !== '繋がらず')
+  const connectedAt    = connectedLog?.connected_attempt ?? (missedCount > 0 ? missedCount + 1 : null)
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
@@ -77,7 +129,11 @@ function BulletinCard({ post }) {
       <div className="p-4 space-y-3">
 
         {/* ① 受付内容 */}
-        <SectionBlock num="1" icon="📋" title="受付内容" headerCls="bg-stone-50" numCls="bg-stone-500">
+        <SectionBlock
+          num="1" icon="📋" title="受付内容"
+          headerCls="bg-stone-50" numCls="bg-stone-500"
+          author={c.assignee} dateStr={fmtShort(c.received_at)}
+        >
           {c.description
             ? <p className="text-sm text-gray-800 leading-relaxed">{c.description}</p>
             : <p className="text-sm text-gray-400 italic">記録なし</p>
@@ -86,19 +142,58 @@ function BulletinCard({ post }) {
 
         {/* ② お客様対応記録 */}
         <SectionBlock
-          num="2" icon="📞" title={`お客様対応記録${contactLogs.length > 0 ? `（連絡 ${contactLogs.length}件）` : ''}`}
+          num="2"
+          icon="📞"
+          title={`お客様対応記録${contactLogs.length > 0 ? `（${contactLogs.length}件）` : ''}`}
           headerCls="bg-sky-50" numCls="bg-sky-500"
+          dateStr={firstContactAt ? fmtShort(firstContactAt) : null}
+          elapsed={elapsedToContact}
         >
           {contactLogs.length > 0 ? (
             <div className="space-y-2">
-              {contactLogs.map((log, i) => (
-                <div key={i} className="flex gap-2.5 items-start">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-sky-100 text-sky-600 text-[10px] font-bold flex items-center justify-center mt-0.5">
-                    {i + 1}
-                  </span>
-                  <p className="text-sm text-gray-700 leading-relaxed">{log.content}</p>
+              {/* サマリーバッジ */}
+              {(missedCount > 0 || connectedAt) && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {missedCount > 0 && (
+                    <span className="text-xs font-semibold bg-red-100 text-red-600 px-2.5 py-0.5 rounded-full">
+                      不通 {missedCount}回
+                    </span>
+                  )}
+                  {connectedAt && (
+                    <span className="text-xs font-semibold bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded-full">
+                      第{connectedAt}回でつながった
+                    </span>
+                  )}
                 </div>
-              ))}
+              )}
+              {contactLogs.map((log, i) => {
+                const isMiss = log.content === '繋がらず'
+                const attempt = log.connected_attempt ?? (i + 1)
+                return (
+                  <div key={i} className={cn(
+                    'flex gap-2.5 items-start px-3 py-2 rounded-lg border text-sm',
+                    isMiss ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'
+                  )}>
+                    <span className={cn(
+                      'flex-shrink-0 w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center mt-0.5',
+                      isMiss ? 'bg-red-200 text-red-700' : 'bg-emerald-200 text-emerald-700'
+                    )}>
+                      {attempt}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className={cn('leading-relaxed', isMiss ? 'text-red-700' : 'text-emerald-800')}>
+                        {isMiss ? '🔴 繋がらず' : `✅ ${log.content}`}
+                      </p>
+                      {log.missed_calls != null && !isMiss && log.missed_calls > 0 && (
+                        <p className="text-[10px] text-gray-400 mt-0.5">（不通{log.missed_calls}回後）</p>
+                      )}
+                    </div>
+                    {log.created_at && (
+                      <span className="text-[10px] text-gray-400 flex-shrink-0">{fmtShort(log.created_at)}</span>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           ) : (
             <p className="text-sm text-gray-400 italic">記録なし</p>
@@ -106,49 +201,74 @@ function BulletinCard({ post }) {
         </SectionBlock>
 
         {/* ③ 現場状況 */}
-        <SectionBlock num="3" icon="🏗️" title="現場状況（現場責任者からの聞き取り）" headerCls="bg-amber-50" numCls="bg-amber-500">
+        <SectionBlock
+          num="3" icon="🏗️" title="現場状況（現場責任者からの聞き取り）"
+          headerCls="bg-amber-50" numCls="bg-amber-500"
+          dateStr={fmtShort(c.hearing_at)} elapsed={elapsedToHearing}
+        >
           {c.hearing
             ? <p className="text-sm text-gray-800 leading-relaxed">{c.hearing}</p>
             : <p className="text-sm text-gray-400 italic">記録なし</p>
           }
         </SectionBlock>
 
-        {/* ④ 現場対応 */}
-        <SectionBlock num="4" icon="🔧" title="現場対応" headerCls="bg-teal-50" numCls="bg-teal-500">
+        {/* ④⑤⑥ 現場対応 / 原因分析 / 現象対策（改善報告書） */}
+        <SectionBlock
+          num="4" icon="🔧" title="現場対応"
+          headerCls="bg-teal-50" numCls="bg-teal-500"
+          author={corrAuthor} dateStr={fmtShort(corrCreatedAt)} elapsed={elapsedToCorr}
+        >
           {c.correction_action
             ? <p className="text-sm text-gray-800 leading-relaxed">{c.correction_action}</p>
             : <p className="text-sm text-gray-400 italic">記録なし</p>
           }
         </SectionBlock>
 
-        {/* ⑤ 原因分析 */}
-        <SectionBlock num="5" icon="🔍" title="原因分析（今回のクレームが起きた原因）" headerCls="bg-rose-50" numCls="bg-rose-500">
+        <SectionBlock
+          num="5" icon="🔍" title="原因分析（今回のクレームが起きた原因）"
+          headerCls="bg-rose-50" numCls="bg-rose-500"
+          author={corrAuthor} dateStr={fmtShort(corrCreatedAt)}
+        >
           {c.direct_cause
             ? <p className="text-sm text-gray-800 leading-relaxed">{c.direct_cause}</p>
             : <p className="text-sm text-gray-400 italic">記録なし</p>
           }
         </SectionBlock>
 
-        {/* ⑥ 現象対策 */}
-        <SectionBlock num="6" icon="💡" title="現象対策（現場で考えた対策案）" headerCls="bg-blue-50" numCls="bg-blue-500">
+        <SectionBlock
+          num="6" icon="💡" title="現象対策（現場で考えた対策案）"
+          headerCls="bg-blue-50" numCls="bg-blue-500"
+          author={corrAuthor} dateStr={fmtShort(corrCreatedAt)}
+        >
           {c.improvement
             ? <p className="text-sm text-gray-800 leading-relaxed">{c.improvement}</p>
             : <p className="text-sm text-gray-400 italic">記録なし</p>
           }
         </SectionBlock>
 
-        {/* ⑦ 組織改善策 */}
-        <SectionBlock num="7" icon="🏢" title="組織改善策（再発防止）" headerCls="bg-orange-50" numCls="bg-orange-500">
+        {/* ⑦⑧⑨ 組織改善策 / 真因分析 / 横展開（深掘り分析） */}
+        <SectionBlock
+          num="7" icon="🏢" title="組織改善策（再発防止）"
+          headerCls="bg-orange-50" numCls="bg-orange-500"
+          author={deepAuthor} dateStr={fmtShort(deepCreatedAt)} elapsed={elapsedToDeep}
+          overdue={actionOverdue}
+        >
           {orgImprove || actionAssignee || actionDeadline || actionProgress ? (
             <div className="space-y-2">
               {orgImprove && <p className="text-sm text-gray-800 leading-relaxed">{orgImprove}</p>}
               {(actionAssignee || actionDeadline || actionProgress) && (
-                <div className="flex items-center gap-3 flex-wrap pt-1 border-t border-orange-100 mt-2">
+                <div className={cn(
+                  'flex items-center gap-3 flex-wrap pt-2 border-t mt-2',
+                  actionOverdue ? 'border-red-200' : 'border-orange-100'
+                )}>
                   {actionAssignee && (
                     <span className="text-xs text-gray-500">担当：<strong className="text-gray-800">{actionAssignee}</strong></span>
                   )}
                   {actionDeadline && (
-                    <span className="text-xs text-gray-500">期限：<strong className="text-gray-800">{actionDeadline}</strong></span>
+                    <span className={cn('text-xs', actionOverdue ? 'text-red-600 font-bold' : 'text-gray-500')}>
+                      期限：<strong>{actionDeadline}</strong>
+                      {actionOverdue && ' ⚠️ 超過'}
+                    </span>
                   )}
                   {actionProgress && (
                     <span className={cn('text-xs font-bold px-2.5 py-0.5 rounded-full', progressBadge)}>
@@ -163,8 +283,11 @@ function BulletinCard({ post }) {
           )}
         </SectionBlock>
 
-        {/* ⑧ 真因分析結果 */}
-        <SectionBlock num="8" icon="🧠" title="真因分析結果" headerCls="bg-violet-50" numCls="bg-violet-500">
+        <SectionBlock
+          num="8" icon="🧠" title="真因分析結果"
+          headerCls="bg-violet-50" numCls="bg-violet-500"
+          author={deepAuthor} dateStr={fmtShort(deepCreatedAt)}
+        >
           {rootCause || rootTheme || rootDetail ? (
             <div className="space-y-2">
               {rootTheme && (
@@ -182,8 +305,11 @@ function BulletinCard({ post }) {
           )}
         </SectionBlock>
 
-        {/* ⑨ 横展開 */}
-        <SectionBlock num="9" icon="🌐" title="横展開" headerCls="bg-emerald-50" numCls="bg-emerald-500">
+        <SectionBlock
+          num="9" icon="🌐" title="横展開"
+          headerCls="bg-emerald-50" numCls="bg-emerald-500"
+          author={deepAuthor} dateStr={fmtShort(deepCreatedAt)}
+        >
           {horizDepts.length > 0 || horizContent ? (
             <div className="space-y-2">
               {horizDepts.length > 0 && (

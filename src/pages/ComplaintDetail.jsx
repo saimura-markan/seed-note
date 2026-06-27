@@ -203,8 +203,11 @@ export default function ComplaintDetail() {
   const handleNotReached = async () => {
     setSaving(true)
     await ensureActive()
+    const attempt = contactLogs.length + 1
+    const missed  = contactLogs.filter(l => l.content === '繋がらず').length + 1
     const { data } = await supabase.from('complaint_logs').insert({
       complaint_id: id, type: 'contact', content: '繋がらず',
+      connected_attempt: attempt, missed_calls: missed,
     }).select().single()
     if (data) setContactLogs(prev => [...prev, data])
     setSaving(false)
@@ -215,8 +218,11 @@ export default function ComplaintDetail() {
     if (!contactInput.trim()) return
     setSaving(true)
     await ensureActive()
+    const attempt = contactLogs.length + 1
+    const missed  = contactLogs.filter(l => l.content === '繋がらず').length
     const { data } = await supabase.from('complaint_logs').insert({
       complaint_id: id, type: 'contact', content: contactInput.trim(),
+      connected_attempt: attempt, missed_calls: missed,
     }).select().single()
     if (data) { setContactLogs(prev => [...prev, data]); setContactInput('') }
     setSaving(false)

@@ -17,6 +17,7 @@ export default function CorrectionSubmit() {
   const [contactLogs,    setContactLogs]    = useState([])
   const [hearingContent, setHearingContent] = useState('')
   const [existing,       setExisting]       = useState(null)
+  const [currentUser,    setCurrentUser]    = useState(null)
 
   const [directCause, setDirectCause] = useState('')
   const [correction,  setCorrection]  = useState('')
@@ -64,6 +65,12 @@ export default function CorrectionSubmit() {
   }, [id])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setCurrentUser(data.session?.user ?? null)
+    })
+  }, [])
 
   // 直接原因が入力されたらQ1を自動表示、消したらリセット
   // DB からの初期ロード時はスキップ（再提出時に既存データをそのまま表示するため）
@@ -132,6 +139,7 @@ export default function CorrectionSubmit() {
       correction,
       improvement,
       socratic_answers: { q1: answers.q1, q2: answers.q2, retry: answers.retry },
+      author_name: currentUser?.user_metadata?.full_name || currentUser?.user_metadata?.name || null,
     }
     if (existing) {
       await supabase.from('complaint_corrections').update(payload).eq('id', existing.id)

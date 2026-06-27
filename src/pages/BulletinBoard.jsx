@@ -95,9 +95,14 @@ function BulletinCard({ post }) {
   const elapsedToCorr    = calcElapsedLabel(c.received_at, corrCreatedAt)
   const elapsedToDeep    = calcElapsedLabel(corrCreatedAt, deepCreatedAt)
 
-  // 組織改善策の期限超過チェック
-  const actionOverdue = actionDeadline && actionProgress !== '完了'
-    && new Date() > new Date(actionDeadline)
+  // 組織改善策の残り日数・超過チェック（日付のみで比較）
+  const daysLeft = (() => {
+    if (!actionDeadline || actionProgress === '完了') return null
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const dl = new Date(actionDeadline + 'T00:00:00'); dl.setHours(0, 0, 0, 0)
+    return Math.round((dl - today) / 86400000)
+  })()
+  const actionOverdue = daysLeft !== null && daysLeft < 0
 
   const progressBadge =
     actionProgress === '完了'   ? 'bg-emerald-100 text-emerald-700' :
@@ -265,9 +270,19 @@ function BulletinCard({ post }) {
                     <span className="text-xs text-gray-500">担当：<strong className="text-gray-800">{actionAssignee}</strong></span>
                   )}
                   {actionDeadline && (
-                    <span className={cn('text-xs', actionOverdue ? 'text-red-600 font-bold' : 'text-gray-500')}>
-                      期限：<strong>{actionDeadline}</strong>
-                      {actionOverdue && ' ⚠️ 超過'}
+                    <span className="text-xs text-gray-500 flex items-center gap-1.5 flex-wrap">
+                      期限：<strong className={actionOverdue ? 'text-red-600' : 'text-gray-800'}>{actionDeadline}</strong>
+                      {daysLeft !== null && daysLeft < 0 && (
+                        <span className="font-bold text-red-600">⚠️ {Math.abs(daysLeft)}日超過</span>
+                      )}
+                      {daysLeft === 0 && (
+                        <span className="font-bold text-orange-500">本日期限</span>
+                      )}
+                      {daysLeft !== null && daysLeft > 0 && (
+                        <span className={cn('font-semibold', daysLeft <= 3 ? 'text-orange-500' : 'text-emerald-700')}>
+                          残り{daysLeft}日
+                        </span>
+                      )}
                     </span>
                   )}
                   {actionProgress && (

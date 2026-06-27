@@ -11,7 +11,7 @@ function statusToStep(status) {
     '受付済': 0,
     '対応中': 1,
     '是正案提出': 2, '是正案差し戻し': 2, '是正案再提出': 2, '是正案承認': 2,
-    '改善報告書提出': 3, 'correction_rejected': 3, 'report_rejected': 3,
+    '改善報告書提出': 3, 'correction_rejected': 3, 'report_rejected': 3, 'supervisor_check': 3,
     '深掘り提出': 5, '役員再協議': 5,
     '承認完了': 6,
   }
@@ -229,6 +229,17 @@ export default function ComplaintOverview() {
     fetchData()
   }
 
+  const handleSupervisorCheckApprove = async () => {
+    await supabase.from('complaint_approvals')
+      .update({ status: 'pending', approved_at: null })
+      .eq('complaint_id', id)
+      .eq('status', 'rejected')
+    await supabase.from('complaints').update({
+      status: '深掘り提出', current_turn_started_at: new Date().toISOString(),
+    }).eq('id', id)
+    fetchData()
+  }
+
   const handleNegotiationReply = async () => {
     if (!negotiationComment.trim()) return
     setNegotiationSending(true)
@@ -260,8 +271,8 @@ export default function ComplaintOverview() {
   const approvedCount = approvals.filter(a => a.status === 'approved').length
   const supervisorConfirmed = supervisorCommentLogs.length > 0 || !!complaint.supervisor_comment
 
-  const PAST_STEP4 = ['是正案提出', '是正案差し戻し', '是正案再提出', '是正案承認', '改善報告書提出', 'correction_rejected', 'report_rejected', '深掘り提出', '承認完了']
-  const PAST_STEP5 = ['是正案承認', '改善報告書提出', 'correction_rejected', 'report_rejected', '深掘り提出', '承認完了']
+  const PAST_STEP4 = ['是正案提出', '是正案差し戻し', '是正案再提出', '是正案承認', '改善報告書提出', 'correction_rejected', 'report_rejected', 'supervisor_check', '深掘り提出', '承認完了']
+  const PAST_STEP5 = ['是正案承認', '改善報告書提出', 'correction_rejected', 'report_rejected', 'supervisor_check', '深掘り提出', '承認完了']
   const PAST_STEP6 = ['改善報告書提出', '深掘り提出', '役員再協議', '承認完了']
   const step2Locked = contactLogs.length === 0
   const step3Locked = !hasHearing
@@ -597,6 +608,8 @@ export default function ComplaintOverview() {
             </div>
             {['correction_rejected', 'report_rejected'].includes(complaint.status)
               ? <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-100 text-red-700">否認・修正待ち</span>
+              : complaint.status === 'supervisor_check'
+              ? <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">事業責任者確認待ち</span>
               : <span className={cn('text-xs font-bold px-2.5 py-1 rounded-full', correction ? 'bg-emerald-100 text-emerald-700' : 'text-stone-400')}>{correction ? '提出済' : '未記録'}</span>
             }
           </div>
@@ -662,6 +675,22 @@ export default function ComplaintOverview() {
               <button onClick={() => navigate(`/complaints/${id}/correction`)}
                 className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold transition-colors">
                 改善報告書を修正する →
+              </button>
+            </div>
+          )}
+          {complaint.status === 'supervisor_check' && ['director', 'admin'].includes(userRole) && (
+            <div className="mx-5 mt-1 mb-3 flex items-start gap-3 bg-blue-50 border border-blue-300 rounded-xl px-4 py-3">
+              <span className="text-lg leading-none">📋</span>
+              <p className="text-sm font-semibold text-blue-800 leading-relaxed">
+                役員差し戻し後の改善報告書が修正・再提出されました。ご確認をお願いします。
+              </p>
+            </div>
+          )}
+          {complaint.status === 'supervisor_check' && ['director', 'admin'].includes(userRole) && (
+            <div className="mx-5 mb-4">
+              <button onClick={handleSupervisorCheckApprove}
+                className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold transition-colors">
+                役員承認に回す →
               </button>
             </div>
           )}

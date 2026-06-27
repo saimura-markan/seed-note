@@ -13,7 +13,7 @@ function statusToStep(status) {
     '受付済': 0,
     '対応中': 1,
     '是正案提出': 2, '是正案差し戻し': 2, '是正案再提出': 2, '是正案承認': 2,
-    '改善報告書提出': 3,
+    '改善報告書提出': 3, 'correction_rejected': 3, 'report_rejected': 3, 'supervisor_check': 3,
     '深掘り提出': 5,
     '承認完了': 6,
   }

@@ -77,10 +77,10 @@ export default function App() {
           <Route path="complaints/new" element={<ComplaintNew />} />
           <Route path="complaints/:id" element={<ComplaintOverview />} />
           <Route path="complaints/:id/detail" element={
-            <RoleGuard user={user} allow={['admin', 'judgment']}><ComplaintDetail /></RoleGuard>
+            <RoleGuard user={user} allow={['admin', 'manager', 'director', 'judgment']}><ComplaintDetail /></RoleGuard>
           } />
           <Route path="complaints/:id/correction" element={
-            <RoleGuard user={user} allow={['admin', 'judgment', 'manager']}><CorrectionSubmit /></RoleGuard>
+            <RoleGuard user={user} allow={['admin', 'manager', 'judgment']}><CorrectionSubmit /></RoleGuard>
           } />
           <Route path="complaints/:id/deep-analysis" element={
             <RoleGuard user={user} allow={['manager', 'director', 'admin']}><DeepAnalysisForm /></RoleGuard>

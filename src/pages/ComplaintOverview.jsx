@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ChevronRight } from 'lucide-react'
-import { cn, getRole } from '@/lib/utils'
+import { cn, getRole, calcDeadlineMinutes, fmtCountdown } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 
 const STEPS = ['受付', '対応中', '事業責任者確認', '改善報告書', '深掘り', '役員承認', '周知完了']
@@ -137,6 +137,13 @@ export default function ComplaintOverview() {
   const [userRole,     setUserRole]     = useState(null)
   const [currentUser,  setCurrentUser]  = useState(null)
   const [loading,      setLoading]      = useState(true)
+  const [tick,         setTick]         = useState(0)
+
+  // 毎分 tick を更新 → 残り時間表示を自動再計算
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 60000)
+    return () => clearInterval(id)
+  }, [])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -735,14 +742,14 @@ export default function ComplaintOverview() {
                 {deepAnalysis.horizontal_content && <p><span className="font-semibold text-gray-500 text-xs">横展開 周知内容：</span>{deepAnalysis.horizontal_content}</p>}
                 {deepAnalysis.action_assignee && <p><span className="font-semibold text-gray-500 text-xs">真因対策 担当者：</span>{deepAnalysis.action_assignee}</p>}
                 {deepAnalysis.action_deadline && (() => {
-                  const today = new Date(); today.setHours(0, 0, 0, 0)
-                  const dl = new Date(deepAnalysis.action_deadline); dl.setHours(0, 0, 0, 0)
-                  const diff = Math.round((dl - today) / 86400000)
-                  const badge = diff < 0
-                    ? <span className="text-red-600 font-bold ml-1">{Math.abs(diff)}日超過</span>
-                    : diff === 0
-                      ? <span className="text-orange-600 font-bold ml-1">本日期限</span>
-                      : <span className="text-emerald-700 font-semibold ml-1">残り{diff}日</span>
+                  void tick
+                  const mins = calcDeadlineMinutes(deepAnalysis.action_deadline, deepAnalysis.action_progress)
+                  const badge = mins === null ? null
+                    : mins < 0
+                      ? <span className="text-red-600 font-bold ml-1">⚠️ {fmtCountdown(mins)}超過</span>
+                      : mins === 0
+                        ? <span className="text-orange-600 font-bold ml-1">本日期限</span>
+                        : <span className={cn('font-semibold ml-1', mins < 4320 ? 'text-orange-500' : 'text-emerald-700')}>残り{fmtCountdown(mins)}</span>
                   return <p><span className="font-semibold text-gray-500 text-xs">真因対策 期限：</span>{deepAnalysis.action_deadline}{badge}</p>
                 })()}
                 {deepAnalysis.action_progress && <p><span className="font-semibold text-gray-500 text-xs">真因対策 進捗：</span>{deepAnalysis.action_progress}</p>}

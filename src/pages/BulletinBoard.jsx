@@ -1,14 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-import { cn } from '@/lib/utils'
+import { cn, calcDeadlineMinutes, fmtCountdown } from '@/lib/utils'
 
 const SUPERIOR_ROLES = ['director', 'executive', 'admin']
-
-function todayStr() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 
 const BULLETIN_CATEGORIES = ['標準化不足', '教育不足', 'ルール未整備', 'システム不備', '顧客確認不足', '引継ぎ不足', 'マネジメント不足', '人員配置問題']
 const BULLETIN_PERIODS = [
@@ -67,7 +62,7 @@ function SectionBlock({ num, icon, title, headerCls, numCls, author, dateStr, el
   )
 }
 
-function BulletinCard({ post, currentUser, today }) {
+function BulletinCard({ post, currentUser, tick }) {
   const c          = post.content   || {}
   const deep       = post.deep      || {}
   const rejections = post.rejections || []
@@ -102,21 +97,19 @@ function BulletinCard({ post, currentUser, today }) {
   const elapsedToCorr    = calcElapsedLabel(c.received_at, corrCreatedAt)
   const elapsedToDeep    = calcElapsedLabel(corrCreatedAt, deepCreatedAt)
 
-  // 組織改善策の残り日数・超過チェック（日付のみで比較）
-  const daysLeft = (() => {
-    if (!actionDeadline || actionProgress === '完了') return null
-    const todayDate = new Date((today || todayStr()) + 'T00:00:00')
-    const dl        = new Date(actionDeadline + 'T00:00:00')
-    return Math.round((dl - todayDate) / 86400000)
-  })()
-  const actionOverdue = daysLeft !== null && daysLeft < 0
+  // 組織改善策の残り時間（tick が変わるたびに再計算）
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const minutesLeft   = calcDeadlineMinutes(actionDeadline, actionProgress)
+  void tick // tick を参照して毎分再レンダリングを起動
+  const actionOverdue = minutesLeft !== null && minutesLeft < 0
+  const countdownText = fmtCountdown(minutesLeft)
 
   // カウントダウン表示権限：担当者本人 or 上位ロール(director以上)のみ
   const userRole    = currentUser?.app_metadata?.seed_note_role || ''
   const userName    = (currentUser?.user_metadata?.full_name || currentUser?.user_metadata?.name || '').trim()
   const isAssignee  = !!(actionAssignee && userName && actionAssignee.trim() === userName)
   const isSuperior  = SUPERIOR_ROLES.includes(userRole)
-  const showCountdown = daysLeft !== null && (isAssignee || isSuperior)
+  const showCountdown = minutesLeft !== null && (isAssignee || isSuperior)
 
   const progressBadge =
     actionProgress === '完了'   ? 'bg-emerald-100 text-emerald-700' :
@@ -286,15 +279,15 @@ function BulletinCard({ post, currentUser, today }) {
                   {actionDeadline && (
                     <span className="text-xs text-gray-500 flex items-center gap-1.5 flex-wrap">
                       期限：<strong className={showCountdown && actionOverdue ? 'text-red-600' : 'text-gray-800'}>{actionDeadline}</strong>
-                      {showCountdown && daysLeft < 0 && (
-                        <span className="font-bold text-red-600">⚠️ {Math.abs(daysLeft)}日超過</span>
+                      {showCountdown && actionOverdue && (
+                        <span className="font-bold text-red-600">⚠️ {countdownText}超過</span>
                       )}
-                      {showCountdown && daysLeft === 0 && (
+                      {showCountdown && minutesLeft === 0 && (
                         <span className="font-bold text-orange-500">本日期限</span>
                       )}
-                      {showCountdown && daysLeft > 0 && (
-                        <span className={cn('font-semibold', daysLeft <= 3 ? 'text-orange-500' : 'text-emerald-700')}>
-                          残り{daysLeft}日
+                      {showCountdown && minutesLeft !== null && minutesLeft > 0 && (
+                        <span className={cn('font-semibold', minutesLeft < 4320 ? 'text-orange-500' : 'text-emerald-700')}>
+                          残り{countdownText}
                         </span>
                       )}
                     </span>
@@ -392,7 +385,7 @@ export default function BulletinBoard() {
   const [bulletinCategories, setBulletinCategories] = useState([])
   const [bulletinPeriod, setBulletinPeriod] = useState('all')
   const [currentUser, setCurrentUser] = useState(null)
-  const [today, setToday] = useState(todayStr)
+  const [tick, setTick] = useState(0)
 
   // ログインユーザー取得
   useEffect(() => {
@@ -401,12 +394,9 @@ export default function BulletinBoard() {
     })
   }, [])
 
-  // 毎分チェック：日付が変わったら today を更新（daysLeft の自動再計算を起動）
+  // 毎分 tick を更新 → BulletinCard が再レンダリングされ残り時間を再計算
   useEffect(() => {
-    const id = setInterval(() => {
-      const next = todayStr()
-      setToday(prev => (prev !== next ? next : prev))
-    }, 60000)
+    const id = setInterval(() => setTick(t => t + 1), 60000)
     return () => clearInterval(id)
   }, [])
 
@@ -587,7 +577,7 @@ export default function BulletinBoard() {
       ) : (
         <div className="space-y-4">
           {filteredBulletinPosts.map(post => (
-            <BulletinCard key={post.id} post={post} currentUser={currentUser} today={today} />
+            <BulletinCard key={post.id} post={post} currentUser={currentUser} tick={tick} />
           ))}
         </div>
       )}

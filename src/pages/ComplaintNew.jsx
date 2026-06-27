@@ -147,6 +147,7 @@ export default function ComplaintNew() {
       department:        form.department,
       assignee:          form.assignee,
       receiver_name:     form.receiverName,
+      work_date:         form.workDate || null,
       status:            'calling',
     }).select('id').single()
     setSubmitting(false)
@@ -299,12 +300,17 @@ export default function ComplaintNew() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">作業に入った日</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  作業に入った日 <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="date"
                   value={form.workDate}
                   onChange={e => set('workDate', e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-stone-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 min-w-0"
+                  className={cn(
+                    "w-full px-3 py-2.5 rounded-xl border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 min-w-0",
+                    !form.workDate ? 'border-red-200 bg-red-50' : 'border-stone-200'
+                  )}
                 />
               </div>
             </div>
@@ -411,14 +417,14 @@ export default function ComplaintNew() {
             <p className="text-sm font-bold text-gray-800">担当</p>
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className={labelCls}>担当部署</label>
+                <label className={labelCls}>担当部署 <span className="text-red-500">*</span></label>
                 <select value={form.department}
                   onChange={e => {
                     const dept = e.target.value
                     const staff = DEPT_STAFF[dept] ?? {}
                     setForm(f => ({ ...f, department: dept, assignee: staff.manager || '', director: staff.director || '' }))
                   }}
-                  className={inputCls + ' bg-white'}>
+                  className={cn(inputCls, !form.department ? 'border-red-200 bg-red-50' : 'bg-white')}>
                   <option value="">選択してください</option>
                   {Object.keys(DEPT_STAFF).map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
@@ -466,7 +472,8 @@ export default function ComplaintNew() {
             className="flex items-center gap-1.5 px-5 h-12 rounded-xl border border-stone-200 text-sm font-semibold text-gray-600 hover:bg-stone-50 transition-colors">
             <X size={14} /> クリア
           </button>
-          <button type="submit" form="complaint-form" disabled={submitting || !form.content.trim()}
+          <button type="submit" form="complaint-form"
+            disabled={submitting || !form.content.trim() || !form.department || !form.workDate}
             className="flex-1 h-12 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white text-sm font-bold transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
             {submitting ? '登録中...' : 'この内容で受け付ける'}
           </button>

@@ -204,7 +204,7 @@ function BulletinCard({ post }) {
         <SectionBlock
           num="3" icon="🏗️" title="現場状況（現場責任者からの聞き取り）"
           headerCls="bg-amber-50" numCls="bg-amber-500"
-          dateStr={fmtShort(c.hearing_at)} elapsed={elapsedToHearing}
+          author={c.hearing_author || ''} dateStr={fmtShort(c.hearing_at)} elapsed={elapsedToHearing}
         >
           {c.hearing
             ? <p className="text-sm text-gray-800 leading-relaxed">{c.hearing}</p>
@@ -378,7 +378,7 @@ export default function BulletinBoard() {
       if (ids.length > 0) {
         const { data: deepRows } = await supabase
           .from('complaint_deep_analysis')
-          .select('complaint_id, root_cause, root_theme, root_detail, org_improvement, horizontal_departments, horizontal_content, action_assignee, action_deadline, action_progress')
+          .select('complaint_id, root_cause, root_theme, root_detail, org_improvement, horizontal_departments, horizontal_content, action_assignee, action_deadline, action_progress, created_at, author_name')
           .in('complaint_id', ids)
         if (deepRows) deepRows.forEach(d => { deepMap[d.complaint_id] = d })
       }

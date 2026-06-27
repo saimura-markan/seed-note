@@ -161,6 +161,7 @@ export default function ComplaintDetail() {
   const [supervisorNote, setSupervisorNote] = useState('')
   const [reportLog, setReportLog]         = useState(null)
   const [improvementReport, setImprovementReport] = useState('')
+  const [currentUser, setCurrentUser]     = useState(null)
 
   const toastTimerRef = useRef(null)
 
@@ -191,6 +192,12 @@ export default function ComplaintDetail() {
   }, [id])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setCurrentUser(data.session?.user ?? null)
+    })
+  }, [])
 
   // ステータスを '対応中' に更新（最初のログ記録時）
   const ensureActive = async () => {
@@ -233,8 +240,10 @@ export default function ComplaintDetail() {
     if (!hearingInput.trim()) return
     setSaving(true)
     await ensureActive()
+    const authorName = currentUser?.user_metadata?.full_name || currentUser?.user_metadata?.name || null
     const { data } = await supabase.from('complaint_logs').insert({
       complaint_id: id, type: 'hearing', content: hearingInput.trim(),
+      author_name: authorName,
     }).select().single()
     if (data) { setHearingLogs(prev => [...prev, data]); setHearingInput('') }
     setSaving(false)

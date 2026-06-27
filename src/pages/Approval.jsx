@@ -215,6 +215,7 @@ export default function Approval() {
             })),
             hearing:                hearingText,
             hearing_at:             hearingLog?.created_at ?? null,
+            hearing_author:         hearingLog?.author_name ?? null,
             correction_action:      correction?.correction,
             correction_author:      correction?.author_name || complaint.assignee || null,
             correction_created_at:  correction?.created_at ?? null,

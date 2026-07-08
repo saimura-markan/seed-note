@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Phone, PhoneOff, ClipboardList, ChevronRight } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { ArrowLeft, Phone, PhoneOff, ClipboardList, ChevronRight, Trash2 } from 'lucide-react'
+import { cn, getRole } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 
 // ─── 定数 ───────────────────────────────────────────────────────────────────
@@ -304,6 +304,19 @@ export default function ComplaintDetail() {
     setTimeout(() => setToast(''), 2500)
   }
 
+  // 削除（論理削除・admin限定）
+  const handleDelete = async () => {
+    if (!window.confirm('このクレームを削除しますか？この操作は元に戻せません。')) return
+    const { error } = await supabase.from('complaints').update({ deleted_at: new Date().toISOString() }).eq('id', id)
+    if (error) {
+      console.error('[handleDelete] Supabase error:', error)
+      setToast('削除に失敗しました')
+      setTimeout(() => setToast(''), 2500)
+      return
+    }
+    navigate('/dashboard')
+  }
+
   if (loading) return (
     <div className="flex items-center justify-center py-32 text-gray-400">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mr-3" />
@@ -330,10 +343,18 @@ export default function ComplaintDetail() {
           {toast}
         </div>
       )}
-      <button onClick={() => navigate(`/complaints/${id}`)}
-        className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 mb-5 transition-colors">
-        <ArrowLeft size={15} /> クレーム詳細に戻る
-      </button>
+      <div className="flex items-center justify-between mb-5">
+        <button onClick={() => navigate(`/complaints/${id}`)}
+          className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 transition-colors">
+          <ArrowLeft size={15} /> クレーム詳細に戻る
+        </button>
+        {getRole(currentUser) === 'admin' && (
+          <button onClick={handleDelete}
+            className="flex items-center gap-1 text-xs text-red-300 hover:text-red-500 transition-colors">
+            <Trash2 size={13} /> 削除
+          </button>
+        )}
+      </div>
 
       <h2 className="text-lg font-bold text-gray-900 mb-1">聞き取り及び対応詳細入力</h2>
 

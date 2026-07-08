@@ -194,7 +194,7 @@ export default function Analytics() {
   useEffect(() => {
     const fetchData = async () => {
       const [{ data: cData }, { data: dData }] = await Promise.all([
-        supabase.from('complaints').select('id, received_at, client_name, client_contact, department, category'),
+        supabase.from('complaints').select('id, received_at, client_name, client_contact, department, category').is('deleted_at', null),
         supabase.from('complaint_deep_analysis').select('complaint_id, root_theme'),
       ])
       if (cData) {

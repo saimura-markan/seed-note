@@ -380,6 +380,7 @@ export default function Dashboard() {
       const { data, error } = await supabase
         .from('complaints')
         .select('*')
+        .is('deleted_at', null)
         .order('received_at', { ascending: false })
       if (error) {
         console.error('[Dashboard] complaints fetch error:', error)

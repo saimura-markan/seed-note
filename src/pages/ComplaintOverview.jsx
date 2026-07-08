@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Trash2 } from 'lucide-react'
 import { cn, getRole, calcDeadlineMinutes, fmtCountdown } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 
@@ -265,6 +265,17 @@ export default function ComplaintOverview() {
     fetchData()
   }
 
+  // 削除（論理削除・admin限定）
+  const handleDelete = async () => {
+    if (!window.confirm('このクレームを一覧から削除します。よろしいですか？')) return
+    const { error } = await supabase.from('complaints').update({ deleted_at: new Date().toISOString() }).eq('id', id)
+    if (error) {
+      console.error('[handleDelete] Supabase error:', error)
+      return
+    }
+    navigate('/dashboard')
+  }
+
   if (loading) return (
     <div className="flex items-center justify-center py-32 text-gray-400">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mr-3" />読み込み中...
@@ -290,10 +301,18 @@ export default function ComplaintOverview() {
 
   return (
     <div className="px-6 py-6 max-w-6xl mx-auto">
-      <button onClick={() => navigate('/dashboard')}
-        className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 mb-5 transition-colors">
-        <ArrowLeft size={15} /> ダッシュボードに戻る
-      </button>
+      <div className="flex items-center justify-between mb-5">
+        <button onClick={() => navigate('/dashboard')}
+          className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 transition-colors">
+          <ArrowLeft size={15} /> ダッシュボードに戻る
+        </button>
+        {getRole(currentUser) === 'admin' && (
+          <button onClick={handleDelete}
+            className="flex items-center gap-1.5 text-sm text-red-500 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-50 transition-colors">
+            <Trash2 size={14} /> 削除
+          </button>
+        )}
+      </div>
 
       <h2 className="text-lg font-bold text-gray-900 mb-1">クレーム詳細</h2>
 

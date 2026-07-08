@@ -306,7 +306,7 @@ export default function ComplaintDetail() {
 
   // 削除（論理削除・admin限定）
   const handleDelete = async () => {
-    if (!window.confirm('このクレームを削除しますか？この操作は元に戻せません。')) return
+    if (!window.confirm('このクレームを一覧から削除します。よろしいですか？')) return
     const { error } = await supabase.from('complaints').update({ deleted_at: new Date().toISOString() }).eq('id', id)
     if (error) {
       console.error('[handleDelete] Supabase error:', error)
@@ -350,8 +350,8 @@ export default function ComplaintDetail() {
         </button>
         {getRole(currentUser) === 'admin' && (
           <button onClick={handleDelete}
-            className="flex items-center gap-1 text-xs text-red-300 hover:text-red-500 transition-colors">
-            <Trash2 size={13} /> 削除
+            className="flex items-center gap-1.5 text-sm text-red-500 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-50 transition-colors">
+            <Trash2 size={14} /> 削除
           </button>
         )}
       </div>

@@ -441,7 +441,7 @@ export default function ComplaintOverview() {
               <p className="text-sm text-gray-400">対応案の提出待ちです。</p>
             )}
           </div>
-          {!reportLog && !correction && ['manager', 'admin'].includes(userRole) && ['受付済', '対応中'].includes(complaint.status) && (
+          {!reportLog && !correction && ['manager', 'director', 'admin'].includes(userRole) && ['受付済', '対応中'].includes(complaint.status) && (
             <div className="mx-5 mb-4">
               <button onClick={() => navigate(`/complaints/${id}/correction`)}
                 className="w-full py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold transition-colors">
@@ -511,7 +511,7 @@ export default function ComplaintOverview() {
         })()}
 
         {/* ④A 対応案の修正・返答 - 是正案差し戻し時のみ（⑤が解放されたら非表示） */}
-        {complaint.status === '是正案差し戻し' && step5Locked && ['manager', 'admin'].includes(userRole) && (
+        {complaint.status === '是正案差し戻し' && step5Locked && ['manager', 'director', 'admin'].includes(userRole) && (
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 border-l-red-400">
             <div className="px-5 py-3.5 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -639,7 +639,7 @@ export default function ComplaintOverview() {
               <p className="text-sm text-gray-400">改善報告書の提出待ちです。</p>
             )}
           </div>
-          {supervisorConfirmed && !correction && ['admin', 'manager'].includes(userRole) && (
+          {supervisorConfirmed && !correction && ['admin', 'manager', 'director'].includes(userRole) && (
             <div className="mx-5 mb-4">
               <button onClick={() => navigate(`/complaints/${id}/correction`)}
                 className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition-colors">
@@ -653,7 +653,7 @@ export default function ComplaintOverview() {
               <p className="text-sm text-gray-700 leading-relaxed">{correctionRejectedLog.content}</p>
             </div>
           )}
-          {complaint.status === 'correction_rejected' && ['admin', 'manager'].includes(userRole) && (
+          {complaint.status === 'correction_rejected' && ['admin', 'manager', 'director'].includes(userRole) && (
             <div className="mx-5 mb-4">
               <button onClick={() => navigate(`/complaints/${id}/correction`)}
                 className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold transition-colors">
@@ -677,7 +677,7 @@ export default function ComplaintOverview() {
               </div>
             )
           })()}
-          {complaint.status === 'report_rejected' && ['admin', 'manager'].includes(userRole) && (
+          {complaint.status === 'report_rejected' && ['admin', 'manager', 'director'].includes(userRole) && (
             <div className="mx-5 mb-4">
               <button onClick={() => navigate(`/complaints/${id}/correction`)}
                 className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold transition-colors">

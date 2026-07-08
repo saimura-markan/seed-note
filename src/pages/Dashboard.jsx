@@ -461,7 +461,7 @@ export default function Dashboard() {
     if (role === 'admin') {
       return complaints.filter(c => actionableSet.has(c.status)).length
     }
-    if (role === 'manager') {
+    if (['manager', 'director'].includes(role)) {
       const displayName = profileName || user?.user_metadata?.full_name || user?.user_metadata?.name || ''
       return complaints.filter(c =>
         actionableSet.has(c.status) &&

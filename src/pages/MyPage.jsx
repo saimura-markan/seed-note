@@ -64,6 +64,9 @@ export default function MyPage() {
     const { error } = await supabase.from('profiles').upsert({
       id: user.id, name, name_kana, phone, department,
     })
+    await supabase.auth.updateUser({
+      data: { display_name: name, full_name: name }
+    })
     setSaving(false)
     if (error) setSaveErr(error.message)
     else setSaveMsg('変更を保存しました')

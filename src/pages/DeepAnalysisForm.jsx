@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 
 const ROOT_THEMES  = ['教育不足', '標準化不足', 'ルール未整備', 'システム不備', '顧客確認不足', '引継ぎ不足', 'マネジメント不足', '人員配置問題']
-const DEPARTMENTS  = ['解体部', '養生部', '産廃部', '清掃部', '事務']
+const DEPARTMENTS  = ['工事部解体課', '工事部産廃課', '清掃部清掃１課', '清掃部清掃２課', '環境リサイクル部', '本部']
 
 function fmtDateTime(iso) {
   if (!iso) return '—'

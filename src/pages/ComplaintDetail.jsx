@@ -413,10 +413,9 @@ export default function ComplaintDetail() {
         {/* 記録入力 */}
         <div className="flex gap-2">
           <textarea value={contactInput} onChange={e => setContactInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && e.shiftKey && handleContactLog()}
             className="flex-1 px-3 py-2 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition resize-none"
             rows={3}
-            placeholder="連絡内容を入力（例：折り返しの了承をいただいた）&#10;Shift+Enterで送信" />
+            placeholder="連絡内容を入力（例：折り返しの了承をいただいた）" />
           <button type="button" onClick={handleContactLog} disabled={saving || !contactInput.trim()}
             className="px-4 h-10 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold transition-colors disabled:opacity-40">
             記録する
@@ -445,10 +444,9 @@ export default function ComplaintDetail() {
         )}
         <div className="flex gap-2">
           <textarea value={hearingInput} onChange={e => setHearingInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && e.shiftKey && handleHearingLog()}
             className="flex-1 px-3 py-2 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition resize-none"
             rows={3}
-            placeholder="作業者からの聞き取り内容を記録してください&#10;Shift+Enterで送信" />
+            placeholder="作業者からの聞き取り内容を記録してください" />
           <button type="button" onClick={handleHearingLog} disabled={saving || !hearingInput.trim()}
             className="px-4 h-10 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold transition-colors disabled:opacity-40">
             記録する
@@ -536,10 +534,9 @@ export default function ComplaintDetail() {
                 <textarea
                   value={supervisorNote}
                   onChange={e => setSupervisorNote(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && e.shiftKey && supervisorNote.trim() && handleReportToSupervisor()}
                   rows={4}
                   className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 transition resize-none"
-                  placeholder={`お客様のご意見と作業者への聞き取りを踏まえ、あなたはどうすべきだと思いますか？\nShift+Enterで送信`}
+                  placeholder="お客様のご意見と作業者への聞き取りを踏まえ、あなたはどうすべきだと思いますか？"
                 />
                 {supervisorNote.trim() && (
                   <button type="button" onClick={handleReportToSupervisor} disabled={saving}

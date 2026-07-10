@@ -30,6 +30,36 @@ const PRIORITY = {
 
 // ─── ヘルパー ─────────────────────────────────────────────────────────────────
 
+// 下書き自動保存（localStorage）。使えない環境でも落ちないようtry/catchで囲む。
+function draftKey(type, id) {
+  return `draft_${type}_${id}`
+}
+
+function loadDraft(type, id) {
+  try {
+    return localStorage.getItem(draftKey(type, id)) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function saveDraft(type, id, value) {
+  try {
+    if (value) localStorage.setItem(draftKey(type, id), value)
+    else localStorage.removeItem(draftKey(type, id))
+  } catch {
+    // localStorageが使えない環境（プライベートモード等）では何もしない
+  }
+}
+
+function clearDraft(type, id) {
+  try {
+    localStorage.removeItem(draftKey(type, id))
+  } catch {
+    // 同上
+  }
+}
+
 function fmtDateTime(iso) {
   if (!iso) return '—'
   const d = new Date(iso)
@@ -176,6 +206,18 @@ export default function ComplaintDetail() {
     return () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current) }
   }, [])
 
+  // マウント時に下書きを復元（未送信テキストのみ。DB保存済みの記録はfetchDataが別途扱う）
+  useEffect(() => {
+    setContactInput(loadDraft('contact', id))
+    setHearingInput(loadDraft('hearing', id))
+    setSupervisorNote(loadDraft('supervisor', id))
+  }, [id])
+
+  // 入力のたびに下書きを自動保存
+  useEffect(() => { saveDraft('contact', id, contactInput) }, [id, contactInput])
+  useEffect(() => { saveDraft('hearing', id, hearingInput) }, [id, hearingInput])
+  useEffect(() => { saveDraft('supervisor', id, supervisorNote) }, [id, supervisorNote])
+
   const fetchData = useCallback(async () => {
     const [{ data: c }, { data: logs }] = await Promise.all([
       supabase.from('complaints').select('*').eq('id', id).maybeSingle(),
@@ -231,7 +273,7 @@ export default function ComplaintDetail() {
       complaint_id: id, type: 'contact', content: contactInput.trim(),
       connected_attempt: attempt, missed_calls: missed,
     }).select().single()
-    if (data) { setContactLogs(prev => [...prev, data]); setContactInput('') }
+    if (data) { setContactLogs(prev => [...prev, data]); setContactInput(''); clearDraft('contact', id) }
     setSaving(false)
   }
 
@@ -245,7 +287,7 @@ export default function ComplaintDetail() {
       complaint_id: id, type: 'hearing', content: hearingInput.trim(),
       author_name: authorName,
     }).select().single()
-    if (data) { setHearingLogs(prev => [...prev, data]); setHearingInput('') }
+    if (data) { setHearingLogs(prev => [...prev, data]); setHearingInput(''); clearDraft('hearing', id) }
     setSaving(false)
   }
 
@@ -298,6 +340,7 @@ export default function ComplaintDetail() {
     const reportedAt = new Date().toISOString()
     await supabase.from('complaints').update({ status: '是正案提出', supervisor_reported_at: reportedAt, current_turn_started_at: new Date().toISOString() }).eq('id', id)
     setComplaint(c => ({ ...c, status: '是正案提出', supervisor_reported_at: reportedAt }))
+    clearDraft('supervisor', id)
     setSaving(false)
     setToast('上司に報告しました ✅')
     toastTimerRef.current = setTimeout(() => {

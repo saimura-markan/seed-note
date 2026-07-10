@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ChevronRight, Trash2 } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Trash2, Image as ImageIcon, X } from 'lucide-react'
 import { cn, getRole, calcDeadlineMinutes, fmtCountdown } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
+import { compressImage } from '@/lib/imageCompress'
 
 const STEPS = ['受付', '対応中', '事業責任者確認', '改善報告書', '深掘り', '役員承認', '周知完了']
 
@@ -138,6 +139,10 @@ export default function ComplaintOverview() {
   const [currentUser,  setCurrentUser]  = useState(null)
   const [loading,      setLoading]      = useState(true)
   const [tick,         setTick]         = useState(0)
+  const [photos,        setPhotos]        = useState([])
+  const [uploadingCount, setUploadingCount] = useState(0)
+  const [viewerPhoto,    setViewerPhoto]    = useState(null)
+  const fileInputRef = useRef(null)
 
   // 毎分 tick を更新 → 残り時間表示を自動再計算
   useEffect(() => {
@@ -155,13 +160,24 @@ export default function ComplaintOverview() {
     })
   }, [])
 
+  // 非公開バケットのため署名付きURLをまとめて発行（1回のバッチ呼び出し）
+  const loadPhotosWithUrls = useCallback(async (rows) => {
+    if (!rows || rows.length === 0) { setPhotos([]); return }
+    const { data: signed } = await supabase.storage
+      .from('complaint-photos')
+      .createSignedUrls(rows.map(r => r.storage_path), 3600)
+    const urlByPath = new Map((signed ?? []).map(s => [s.path, s.signedUrl]))
+    setPhotos(rows.map(r => ({ ...r, url: urlByPath.get(r.storage_path) ?? null })))
+  }, [])
+
   const fetchData = useCallback(async () => {
-    const [{ data: c }, { data: logs }, { data: corr }, { data: deep }, { data: appr }] = await Promise.all([
+    const [{ data: c }, { data: logs }, { data: corr }, { data: deep }, { data: appr }, { data: photoRows }] = await Promise.all([
       supabase.from('complaints').select('*').eq('id', id).maybeSingle(),
       supabase.from('complaint_logs').select('*').eq('complaint_id', id).order('created_at'),
       supabase.from('complaint_corrections').select('*').eq('complaint_id', id).order('created_at').limit(1),
       supabase.from('complaint_deep_analysis').select('*').eq('complaint_id', id).order('created_at').limit(1),
       supabase.from('complaint_approvals').select('status, approver_name, approver_role, comment, approved_at').eq('complaint_id', id).order('sort_order'),
+      supabase.from('complaint_photos').select('*').eq('complaint_id', id).order('created_at'),
     ])
     if (c) setComplaint(c)
     if (logs) {
@@ -183,13 +199,14 @@ export default function ComplaintOverview() {
     if (corr && corr[0]) setCorrection(corr[0])
     if (deep && deep[0]) setDeepAnalysis(deep[0])
     if (appr) setApprovals(appr)
+    if (photoRows) await loadPhotosWithUrls(photoRows)
     console.log('[ComplaintOverview] fetchData:', {
       status: c?.status,
       correction: corr?.[0] ? '存在' : 'なし',
       deepAnalysis: deep?.[0] ? '存在' : 'なし',
     })
     setLoading(false)
-  }, [id])
+  }, [id, loadPhotosWithUrls])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -274,6 +291,50 @@ export default function ComplaintOverview() {
       return
     }
     navigate('/dashboard')
+  }
+
+  // 写真選択 → 圧縮 → アップロード（選択と同時に自動開始。保存ボタンなし）
+  const handlePhotoSelect = async (e) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+    e.target.value = ''
+    setUploadingCount(n => n + files.length)
+
+    await Promise.allSettled(files.map(async file => {
+      try {
+        const blob = await compressImage(file)
+        const path = `${id}/${crypto.randomUUID()}.jpg`
+        const { error: uploadError } = await supabase.storage
+          .from('complaint-photos')
+          .upload(path, blob, { contentType: 'image/jpeg' })
+        if (uploadError) throw uploadError
+
+        const { data: row, error: insertError } = await supabase.from('complaint_photos').insert({
+          complaint_id: id, storage_path: path, file_name: file.name, uploaded_by: currentUser?.id,
+        }).select().single()
+        if (insertError) throw insertError
+
+        const { data: signed } = await supabase.storage.from('complaint-photos').createSignedUrl(path, 3600)
+        setPhotos(prev => [...prev, { ...row, url: signed?.signedUrl ?? null }])
+      } catch (err) {
+        console.error('[handlePhotoSelect] failed:', err)
+      } finally {
+        setUploadingCount(n => Math.max(0, n - 1))
+      }
+    }))
+  }
+
+  // 削除可否：自分がアップした分、またはadmin
+  const canDeletePhoto = (photo) => photo.uploaded_by === currentUser?.id || getRole(currentUser) === 'admin'
+
+  const handleDeletePhoto = async (photo) => {
+    if (!window.confirm('この写真を削除しますか？')) return
+    const { error: storageError } = await supabase.storage.from('complaint-photos').remove([photo.storage_path])
+    if (storageError) { console.error('[handleDeletePhoto] storage error:', storageError); return }
+    const { error } = await supabase.from('complaint_photos').delete().eq('id', photo.id)
+    if (error) { console.error('[handleDeletePhoto] Supabase error:', error); return }
+    setPhotos(prev => prev.filter(p => p.id !== photo.id))
+    setViewerPhoto(prev => (prev?.id === photo.id ? null : prev))
   }
 
   if (loading) return (
@@ -362,6 +423,76 @@ export default function ComplaintOverview() {
           </div>
         )}
       </div>
+
+      {/* 写真・画像（常時表示） */}
+      <div className="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 border-l-sky-400 mb-5">
+        <div className="px-5 py-3.5 border-b border-stone-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ImageIcon size={15} className="text-sky-600" />
+            <span className="text-sm font-bold text-gray-800">写真・画像</span>
+          </div>
+          <span className={cn('text-xs font-bold px-2.5 py-1 rounded-full', photos.length > 0 ? 'bg-sky-100 text-sky-700' : 'text-stone-400')}>
+            {photos.length}件
+          </span>
+        </div>
+        <div className="p-5">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handlePhotoSelect}
+            className="hidden"
+          />
+          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadingCount > 0}
+            className="w-full py-2.5 rounded-xl border-2 border-sky-200 bg-sky-50 text-sky-700 text-sm font-bold hover:bg-sky-100 transition-colors mb-3 disabled:opacity-50 flex items-center justify-center gap-2">
+            <ImageIcon size={14} /> 写真を添付{uploadingCount > 0 ? `（アップロード中 ${uploadingCount}件）` : ''}
+          </button>
+
+          {(photos.length > 0 || uploadingCount > 0) ? (
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              {photos.map(photo => (
+                <div key={photo.id} className="relative aspect-square rounded-lg overflow-hidden bg-stone-100">
+                  {photo.url ? (
+                    <button type="button" onClick={() => setViewerPhoto(photo)} className="w-full h-full block">
+                      <img src={photo.url} alt={photo.file_name || ''} className="w-full h-full object-cover" />
+                    </button>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-emerald-600" />
+                    </div>
+                  )}
+                  {canDeletePhoto(photo) && (
+                    <button type="button" onClick={() => handleDeletePhoto(photo)}
+                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-red-600 transition-colors">
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              ))}
+              {Array.from({ length: uploadingCount }).map((_, i) => (
+                <div key={`uploading-${i}`} className="aspect-square rounded-lg bg-stone-100 flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-emerald-600" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400">まだ写真がありません。</p>
+          )}
+        </div>
+      </div>
+
+      {/* 写真の原寸表示モーダル */}
+      {viewerPhoto && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setViewerPhoto(null)}>
+          <button type="button" onClick={() => setViewerPhoto(null)}
+            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors">
+            <X size={20} />
+          </button>
+          <img src={viewerPhoto.url} alt={viewerPhoto.file_name || ''}
+            className="max-w-full max-h-full object-contain" onClick={e => e.stopPropagation()} />
+        </div>
+      )}
 
       {/* セクション状態一覧 */}
       <div className="space-y-3 mb-5">

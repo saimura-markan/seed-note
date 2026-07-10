@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Phone, PhoneOff, ClipboardList, ChevronRight, Trash2 } from 'lucide-react'
+import { ArrowLeft, Phone, PhoneOff, ClipboardList, ChevronRight, Trash2, Undo2 } from 'lucide-react'
 import { cn, getRole } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 
@@ -249,6 +249,24 @@ export default function ComplaintDetail() {
     setSaving(false)
   }
 
+  // 連絡記録の取り消し（admin限定・再入力用）
+  const handleUndoContactLog = async (log) => {
+    if (!window.confirm('この記録を取り消して再入力できるようにします。内容は入力欄に残ります。よろしいですか？')) return
+    if (log.content !== '繋がらず') setContactInput(log.content)
+    const { error } = await supabase.from('complaint_logs').delete().eq('id', log.id)
+    if (error) { console.error('[handleUndoContactLog] Supabase error:', error); return }
+    setContactLogs(prev => prev.filter(l => l.id !== log.id))
+  }
+
+  // 聞き取り記録の取り消し（admin限定・再入力用）
+  const handleUndoHearingLog = async (log) => {
+    if (!window.confirm('この記録を取り消して再入力できるようにします。内容は入力欄に残ります。よろしいですか？')) return
+    setHearingInput(log.content)
+    const { error } = await supabase.from('complaint_logs').delete().eq('id', log.id)
+    if (error) { console.error('[handleUndoHearingLog] Supabase error:', error); return }
+    setHearingLogs(prev => prev.filter(l => l.id !== log.id))
+  }
+
   // 対応判断
   const handleJudgment = async (j) => {
     setJudgment(j)
@@ -375,6 +393,12 @@ export default function ComplaintDetail() {
                 <span className="font-bold shrink-0">{log.content === '繋がらず' ? '🔴' : '✅'}</span>
                 <span className="flex-1">{log.content}</span>
                 <span className="text-[11px] text-gray-400 shrink-0 mt-0.5">{fmtDateTime(log.created_at)}</span>
+                {getRole(currentUser) === 'admin' && (
+                  <button type="button" onClick={() => handleUndoContactLog(log)}
+                    className="shrink-0 text-red-400 hover:text-red-600 transition-colors" title="取り消し">
+                    <Undo2 size={14} />
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -409,6 +433,12 @@ export default function ComplaintDetail() {
                 <span className="font-bold shrink-0">✅</span>
                 <span className="flex-1">{log.content}</span>
                 <span className="text-[11px] text-gray-400 shrink-0 mt-0.5">{fmtDateTime(log.created_at)}</span>
+                {getRole(currentUser) === 'admin' && (
+                  <button type="button" onClick={() => handleUndoHearingLog(log)}
+                    className="shrink-0 text-red-400 hover:text-red-600 transition-colors" title="取り消し">
+                    <Undo2 size={14} />
+                  </button>
+                )}
               </div>
             ))}
           </div>

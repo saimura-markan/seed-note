@@ -404,7 +404,7 @@ export default function ComplaintOverview() {
               <p className="text-sm text-gray-400">まだ連絡が記録されていません。</p>
             )}
           </div>
-          {contactLogs.length === 0 && userRole !== 'staff' && (
+          {(contactLogs.length === 0 || userRole === 'admin') && userRole !== 'staff' && (
             <div className="mx-5 mb-4">
               <button onClick={() => navigate(`/complaints/${id}/detail`)}
                 className="w-full py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm transition-colors flex items-center justify-center gap-2">

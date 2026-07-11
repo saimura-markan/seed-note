@@ -1,10 +1,28 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { FileText, FileSpreadsheet, File as FileIcon, Download, Trash2, Upload } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import {
   cn,
   getDeadlineStatus, getDaysOverdue, getDaysRemaining, getTodayDateStr, DEADLINE_STATUS_STYLES,
 } from '@/lib/utils'
+
+const MANUAL_BUCKET = 'seed-manuals'
+const MANUAL_MAX_SIZE = 20 * 1024 * 1024 // 20MB
+
+function formatFileSize(bytes) {
+  if (bytes == null) return ''
+  if (bytes < 1024) return `${bytes}B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
+}
+
+function ManualFileIcon({ mimeType }) {
+  if (mimeType?.includes('pdf')) return <FileText size={16} className="text-red-500 shrink-0" />
+  if (mimeType?.includes('sheet') || mimeType?.includes('excel')) return <FileSpreadsheet size={16} className="text-emerald-600 shrink-0" />
+  if (mimeType?.includes('word') || mimeType?.includes('document')) return <FileText size={16} className="text-blue-600 shrink-0" />
+  return <FileIcon size={16} className="text-gray-500 shrink-0" />
+}
 
 const SUPERIOR_ROLES = ['director', 'executive', 'admin']
 
@@ -123,6 +141,70 @@ function BulletinCard({ post, currentUser, tick }) {
     actionProgress === '完了'   ? 'bg-emerald-100 text-emerald-700' :
     actionProgress === '進行中' ? 'bg-blue-100 text-blue-700'       :
                                   'bg-stone-100 text-stone-600'
+
+  // 提出マニュアル（担当者本人 or director以上のみ提出・削除可。閲覧・DLは誰でも可）
+  const [manuals, setManuals] = useState(post.manuals || [])
+  const [uploadingManualCount, setUploadingManualCount] = useState(0)
+  const canSubmitManual = isAssignee || isSuperior
+
+  const handleManualSelect = async (e) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+    e.target.value = ''
+    const validFiles = files.filter(file => {
+      if (file.size > MANUAL_MAX_SIZE) {
+        window.alert(`${file.name} は20MBを超えているためアップロードできません`)
+        return false
+      }
+      return true
+    })
+    if (validFiles.length === 0) return
+    setUploadingManualCount(n => n + validFiles.length)
+
+    await Promise.allSettled(validFiles.map(async file => {
+      try {
+        const ext = file.name.includes('.') ? file.name.split('.').pop() : ''
+        const path = `${post.complaint_id}/${crypto.randomUUID()}${ext ? '.' + ext : ''}`
+        // 圧縮しない。原本をそのままアップロード
+        const { error: uploadError } = await supabase.storage
+          .from(MANUAL_BUCKET)
+          .upload(path, file, { contentType: file.type || undefined })
+        if (uploadError) throw uploadError
+
+        const { data: row, error: insertError } = await supabase.from('manual_submissions').insert({
+          complaint_id: post.complaint_id, storage_path: path, file_name: file.name,
+          file_size: file.size, mime_type: file.type || null, uploaded_by: currentUser?.id,
+        }).select().single()
+        if (insertError) throw insertError
+
+        setManuals(prev => [...prev, row])
+      } catch (err) {
+        console.error('[handleManualSelect] failed:', err)
+      } finally {
+        setUploadingManualCount(n => Math.max(0, n - 1))
+      }
+    }))
+  }
+
+  // DL時のみ署名付きURLを発行（一覧表示時にまとめて発行しない。提出数が少なく、期限切れリンクの管理も避けられるため）
+  const handleManualDownload = async (manual) => {
+    const { data, error } = await supabase.storage
+      .from(MANUAL_BUCKET)
+      .createSignedUrl(manual.storage_path, 60, { download: manual.file_name })
+    if (error || !data?.signedUrl) { console.error('[handleManualDownload] failed:', error); return }
+    window.open(data.signedUrl, '_blank')
+  }
+
+  const canDeleteManual = (manual) => manual.uploaded_by === currentUser?.id || isSuperior
+
+  const handleManualDelete = async (manual) => {
+    if (!window.confirm('このマニュアルを削除しますか？')) return
+    const { error: storageError } = await supabase.storage.from(MANUAL_BUCKET).remove([manual.storage_path])
+    if (storageError) { console.error('[handleManualDelete] storage error:', storageError); return }
+    const { error } = await supabase.from('manual_submissions').delete().eq('id', manual.id)
+    if (error) { console.error('[handleManualDelete] Supabase error:', error); return }
+    setManuals(prev => prev.filter(m => m.id !== manual.id))
+  }
 
   // お客様対応記録のサマリー
   const missedCount    = contactLogs.filter(l => l.content === '繋がらず').length
@@ -307,6 +389,52 @@ function BulletinCard({ post, currentUser, tick }) {
                   )}
                 </div>
               )}
+
+              {/* 提出マニュアル */}
+              <div className="pt-2 border-t border-stone-100 mt-2">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-bold text-gray-600">提出マニュアル（{manuals.length}件）</p>
+                  {canSubmitManual && (
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-2.5 py-1 cursor-pointer hover:bg-orange-100 transition-colors">
+                      <Upload size={12} />
+                      マニュアルを提出{uploadingManualCount > 0 ? `（${uploadingManualCount}件アップロード中）` : ''}
+                      <input
+                        type="file"
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        multiple
+                        onChange={handleManualSelect}
+                        disabled={uploadingManualCount > 0}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                </div>
+                {manuals.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {manuals.map(manual => (
+                      <div key={manual.id} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-stone-200 bg-white text-xs">
+                        <ManualFileIcon mimeType={manual.mime_type} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-gray-800 font-medium truncate">{manual.file_name}</p>
+                          <p className="text-[10px] text-gray-400">{formatFileSize(manual.file_size)}・{fmtShort(manual.created_at)}</p>
+                        </div>
+                        <button type="button" onClick={() => handleManualDownload(manual)}
+                          className="shrink-0 text-gray-400 hover:text-emerald-600 transition-colors" title="ダウンロード">
+                          <Download size={14} />
+                        </button>
+                        {canDeleteManual(manual) && (
+                          <button type="button" onClick={() => handleManualDelete(manual)}
+                            className="shrink-0 text-gray-300 hover:text-red-600 transition-colors" title="削除">
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400 italic">まだ提出がありません</p>
+                )}
+              </div>
             </div>
           ) : (
             <p className="text-sm text-gray-400 italic">記録なし</p>
@@ -461,11 +589,28 @@ export default function BulletinBoard() {
         }
       }
 
+      // 提出マニュアルを一括取得（クレームごとの個別クエリはしない）
+      let manualsMap = {}
+      if (ids.length > 0) {
+        const { data: manualRows } = await supabase
+          .from('manual_submissions')
+          .select('*')
+          .in('complaint_id', ids)
+          .order('created_at', { ascending: true })
+        if (manualRows) {
+          manualRows.forEach(m => {
+            if (!manualsMap[m.complaint_id]) manualsMap[m.complaint_id] = []
+            manualsMap[m.complaint_id].push(m)
+          })
+        }
+      }
+
       setBulletinPosts(posts.map(p => ({
         ...p,
         deep:       deepMap[p.complaint_id]       ?? null,
         rejections: rejectionsMap[p.complaint_id] ?? [],
         negReplies: negReplyMap[p.complaint_id]   ?? [],
+        manuals:    manualsMap[p.complaint_id]    ?? [],
       })))
       setBulletinLoading(false)
   }, [])

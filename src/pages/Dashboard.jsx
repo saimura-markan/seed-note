@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { Sprout, CalendarDays, Clock, BarChart2 } from 'lucide-react'
-import { cn, getRole } from '@/lib/utils'
+import { cn, getRole, getDeadlineStatus, getDaysOverdue, getDaysRemaining, getTodayDateStr, DEADLINE_STATUS_STYLES } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -219,7 +219,7 @@ function StepProgressBar({ status }) {
   )
 }
 
-function ComplaintCard({ c, onClick, firstContactMin, role }) {
+function ComplaintCard({ c, onClick, firstContactMin, role, deepAnalysis }) {
   const pc         = PRIORITY[c.priority] ?? PRIORITY[1]
   const myTurnSet  = MY_TURN_STATUSES[role] ?? MY_TURN_STATUSES.manager
   const isMyTurn   = myTurnSet.has(c.status)
@@ -229,6 +229,19 @@ function ComplaintCard({ c, onClick, firstContactMin, role }) {
   const timer = c.status === '承認完了'
     ? null
     : isMyTurn ? calcStepTimer(c.status, c.receivedAt, c.currentTurnStartedAt, c.deadlineMinutes) : null
+
+  // 真因対策の期限アラート（4段階）。日付文字列をuseMemoのキーにし、日付が変わった時だけ再計算する
+  // （親のDashboardは1秒ごとのtickで再レンダリングされるが、この計算自体は毎秒走らせない）
+  const todayStr = getTodayDateStr()
+  const actionDeadline = deepAnalysis?.action_deadline ?? null
+  const actionProgress = deepAnalysis?.action_progress ?? null
+  const deadlineStatus = useMemo(
+    () => getDeadlineStatus(actionDeadline, actionProgress === '完了'),
+    [actionDeadline, actionProgress, todayStr]
+  )
+  const deadlineStyle = deadlineStatus ? DEADLINE_STATUS_STYLES[deadlineStatus] : null
+  const deadlineDaysOverdue = deadlineStatus === 'overdue' ? getDaysOverdue(actionDeadline) : 0
+  const deadlineDaysLeft = (deadlineStatus === 'normal' || deadlineStatus === 'soon') ? getDaysRemaining(actionDeadline) : null
 
   return (
     <div
@@ -295,6 +308,25 @@ function ComplaintCard({ c, onClick, firstContactMin, role }) {
           )}
         </div>
       </div>
+
+      {/* 真因対策 期限バー */}
+      {deadlineStatus && (
+        <div className={cn('mt-3 flex items-center gap-2 flex-wrap px-3 py-2 rounded-lg border-l-4', deadlineStyle.border, deadlineStyle.bg)}>
+          <span className="text-xs text-gray-500">真因対策</span>
+          {deepAnalysis?.action_deadline && (
+            <span className={cn('text-xs font-semibold', deadlineStyle.text)}>期限 {deepAnalysis.action_deadline}</span>
+          )}
+          {deadlineStatus === 'overdue' && (
+            <span className="text-xs font-bold text-red-600">⚠️ {deadlineDaysOverdue}日経過</span>
+          )}
+          {deadlineStatus === 'today' && (
+            <span className="text-xs font-bold text-orange-600">本日期限</span>
+          )}
+          {(deadlineStatus === 'normal' || deadlineStatus === 'soon') && (
+            <span className={cn('text-xs font-semibold', deadlineStyle.text)}>残り{deadlineDaysLeft}日</span>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -367,6 +399,7 @@ export default function Dashboard() {
   const role = getRole(user)
   const [complaints, setComplaints] = useState([])
   const [firstContactMap, setFirstContactMap] = useState({})
+  const [deepAnalysisMap, setDeepAnalysisMap] = useState({})
   const [loading, setLoading] = useState(true)
   const [, setTick] = useState(0)
   const [tab, setTab] = useState('all')
@@ -374,6 +407,7 @@ export default function Dashboard() {
   const [userDepartment, setUserDepartment] = useState('')
   const [pendingUsersCount, setPendingUsersCount] = useState(0)
   const [myApprovedIds, setMyApprovedIds] = useState(new Set())
+  const [deadlineFilter, setDeadlineFilter] = useState(null) // null | 'overdue' | 'today' | 'soon'
 
   useEffect(() => {
     const fetch = async () => {
@@ -405,6 +439,17 @@ export default function Dashboard() {
               }
             })
             setFirstContactMap(map)
+          }
+
+          // 真因対策の期限アラート用（1回のクエリでまとめて取得。カードごとの個別クエリはしない）
+          const { data: deepRows } = await supabase
+            .from('complaint_deep_analysis')
+            .select('complaint_id, action_deadline, action_progress')
+            .in('complaint_id', ids)
+          if (deepRows) {
+            const map = {}
+            deepRows.forEach(row => { map[row.complaint_id] = row })
+            setDeepAnalysisMap(map)
           }
         }
       }
@@ -456,6 +501,17 @@ export default function Dashboard() {
     if (!statuses) return actionableCount
     return complaints.filter(c => statuses.includes(c.status) && actionableSet.has(c.status)).length
   }
+
+  // 真因対策の期限サマリー（危ない3種のみ集計）。日付文字列をキーにし、日付が変わるまで再計算しない
+  const deadlineTodayStr = getTodayDateStr()
+  const deadlineSummary = useMemo(() => {
+    const counts = { overdue: 0, today: 0, soon: 0 }
+    Object.values(deepAnalysisMap).forEach(row => {
+      const status = getDeadlineStatus(row.action_deadline, row.action_progress === '完了')
+      if (status === 'overdue' || status === 'today' || status === 'soon') counts[status]++
+    })
+    return counts
+  }, [deepAnalysisMap, deadlineTodayStr])
 
   // ロール別・自分に関係するアクション件数（バナー・ヘッダーバッジ用）
   const myActionableCount = useMemo(() => {
@@ -518,9 +574,15 @@ export default function Dashboard() {
     return tabFiltered.filter(c => statuses.includes(c.status)).length
   }
 
-  const displayed = statusFilter === '全て'
+  const displayed = (statusFilter === '全て'
     ? tabFiltered
     : tabFiltered.filter(c => (STATUS_FILTER_GROUPS[statusFilter] ?? []).includes(c.status))
+  ).filter(c => {
+    if (!deadlineFilter) return true
+    const row = deepAnalysisMap[c.id]
+    if (!row) return false
+    return getDeadlineStatus(row.action_deadline, row.action_progress === '完了') === deadlineFilter
+  })
 
   const tabs = [
     { id: 'all',  label: '全件',      count: complaints.length },
@@ -573,6 +635,54 @@ export default function Dashboard() {
           <p className="text-sm font-bold text-red-700">
             あなたの対応が必要なクレームが{myActionableCount}件あります！早急に対応してください！
           </p>
+        </div>
+      )}
+
+      {/* 真因対策 期限サマリーバナー */}
+      {(deadlineSummary.overdue > 0 || deadlineSummary.today > 0 || deadlineSummary.soon > 0) && (
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl px-5 py-3 mb-5">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xl shrink-0">⏰</span>
+            <p className="text-sm font-bold text-amber-800">真因対策の期限が迫っています</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {deadlineSummary.overdue > 0 && (
+              <button
+                onClick={() => setDeadlineFilter(prev => prev === 'overdue' ? null : 'overdue')}
+                className={cn(
+                  'text-xs font-bold px-3 py-1.5 rounded-full border-l-4 transition-colors',
+                  DEADLINE_STATUS_STYLES.overdue.border, DEADLINE_STATUS_STYLES.overdue.bg, DEADLINE_STATUS_STYLES.overdue.text,
+                  deadlineFilter === 'overdue' && 'ring-2 ring-red-400'
+                )}
+              >
+                超過 {deadlineSummary.overdue}件
+              </button>
+            )}
+            {deadlineSummary.today > 0 && (
+              <button
+                onClick={() => setDeadlineFilter(prev => prev === 'today' ? null : 'today')}
+                className={cn(
+                  'text-xs font-bold px-3 py-1.5 rounded-full border-l-4 transition-colors',
+                  DEADLINE_STATUS_STYLES.today.border, DEADLINE_STATUS_STYLES.today.bg, DEADLINE_STATUS_STYLES.today.text,
+                  deadlineFilter === 'today' && 'ring-2 ring-orange-400'
+                )}
+              >
+                本日期限 {deadlineSummary.today}件
+              </button>
+            )}
+            {deadlineSummary.soon > 0 && (
+              <button
+                onClick={() => setDeadlineFilter(prev => prev === 'soon' ? null : 'soon')}
+                className={cn(
+                  'text-xs font-bold px-3 py-1.5 rounded-full border-l-4 transition-colors',
+                  DEADLINE_STATUS_STYLES.soon.border, DEADLINE_STATUS_STYLES.soon.bg, DEADLINE_STATUS_STYLES.soon.text,
+                  deadlineFilter === 'soon' && 'ring-2 ring-amber-400'
+                )}
+              >
+                まもなく {deadlineSummary.soon}件
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -675,6 +785,7 @@ export default function Dashboard() {
               onClick={() => navigate(`/complaints/${c.id}`)}
               firstContactMin={firstContactMap[c.id] ?? null}
               role={role}
+              deepAnalysis={deepAnalysisMap[c.id] ?? null}
             />
           ))
         )}

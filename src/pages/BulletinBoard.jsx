@@ -1,7 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-import { cn, calcDeadlineMinutes, fmtCountdown } from '@/lib/utils'
+import {
+  cn,
+  getDeadlineStatus, getDaysOverdue, getDaysRemaining, getTodayDateStr, DEADLINE_STATUS_STYLES,
+} from '@/lib/utils'
 
 const SUPERIOR_ROLES = ['director', 'executive', 'admin']
 
@@ -97,19 +100,24 @@ function BulletinCard({ post, currentUser, tick }) {
   const elapsedToCorr    = calcElapsedLabel(c.received_at, corrCreatedAt)
   const elapsedToDeep    = calcElapsedLabel(corrCreatedAt, deepCreatedAt)
 
-  // 組織改善策の残り時間（tick が変わるたびに再計算）
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const minutesLeft   = calcDeadlineMinutes(actionDeadline, actionProgress)
   void tick // tick を参照して毎分再レンダリングを起動
-  const actionOverdue = minutesLeft !== null && minutesLeft < 0
-  const countdownText = fmtCountdown(minutesLeft)
+
+  // 期限アラート（4段階）。日付文字列をuseMemoのキーにし、日付が変わった時だけ再計算する
+  const todayStr = getTodayDateStr()
+  const deadlineStatus = useMemo(
+    () => getDeadlineStatus(actionDeadline, actionProgress === '完了'),
+    [actionDeadline, actionProgress, todayStr]
+  )
+  const deadlineStyle = deadlineStatus ? DEADLINE_STATUS_STYLES[deadlineStatus] : null
+  const deadlineDaysOverdue = deadlineStatus === 'overdue' ? getDaysOverdue(actionDeadline) : 0
+  const deadlineDaysLeft = (deadlineStatus === 'normal' || deadlineStatus === 'soon') ? getDaysRemaining(actionDeadline) : null
 
   // カウントダウン表示権限：担当者本人 or 上位ロール(director以上)のみ
   const userRole    = currentUser?.app_metadata?.seed_note_role || ''
   const userName    = (currentUser?.user_metadata?.full_name || currentUser?.user_metadata?.name || '').trim()
   const isAssignee  = !!(actionAssignee && userName && actionAssignee.trim() === userName)
   const isSuperior  = SUPERIOR_ROLES.includes(userRole)
-  const showCountdown = minutesLeft !== null && (isAssignee || isSuperior)
+  const showCountdown = deadlineStatus !== null && (isAssignee || isSuperior)
 
   const progressBadge =
     actionProgress === '完了'   ? 'bg-emerald-100 text-emerald-700' :
@@ -263,31 +271,31 @@ function BulletinCard({ post, currentUser, tick }) {
           num="7" icon="🏢" title="組織改善策（再発防止）"
           headerCls="bg-orange-50" numCls="bg-orange-500"
           author={deepAuthor} dateStr={fmtShort(deepCreatedAt)} elapsed={elapsedToDeep}
-          overdue={actionOverdue}
+          overdue={deadlineStatus === 'overdue'}
         >
           {orgImprove || actionAssignee || actionDeadline || actionProgress ? (
             <div className="space-y-2">
               {orgImprove && <p className="text-sm text-gray-800 leading-relaxed">{orgImprove}</p>}
               {(actionAssignee || actionDeadline || actionProgress) && (
                 <div className={cn(
-                  'flex items-center gap-3 flex-wrap pt-2 border-t mt-2',
-                  actionOverdue ? 'border-red-200' : 'border-orange-100'
+                  'flex items-center gap-3 flex-wrap px-3 py-2 rounded-lg border-l-4 mt-2',
+                  deadlineStyle ? cn(deadlineStyle.border, deadlineStyle.bg) : 'border-l-stone-200 bg-stone-50'
                 )}>
                   {actionAssignee && (
                     <span className="text-xs text-gray-500">担当：<strong className="text-gray-800">{actionAssignee}</strong></span>
                   )}
                   {actionDeadline && (
                     <span className="text-xs text-gray-500 flex items-center gap-1.5 flex-wrap">
-                      期限：<strong className={showCountdown && actionOverdue ? 'text-red-600' : 'text-gray-800'}>{actionDeadline}</strong>
-                      {showCountdown && actionOverdue && (
-                        <span className="font-bold text-red-600">⚠️ {countdownText}超過</span>
+                      期限：<strong className={deadlineStyle ? deadlineStyle.text : 'text-gray-800'}>{actionDeadline}</strong>
+                      {showCountdown && deadlineStatus === 'overdue' && (
+                        <span className="font-bold text-red-600">⚠️ {deadlineDaysOverdue}日経過</span>
                       )}
-                      {showCountdown && minutesLeft === 0 && (
-                        <span className="font-bold text-orange-500">本日期限</span>
+                      {showCountdown && deadlineStatus === 'today' && (
+                        <span className="font-bold text-orange-600">本日期限</span>
                       )}
-                      {showCountdown && minutesLeft !== null && minutesLeft > 0 && (
-                        <span className={cn('font-semibold', minutesLeft < 4320 ? 'text-orange-500' : 'text-emerald-700')}>
-                          残り{countdownText}
+                      {showCountdown && (deadlineStatus === 'normal' || deadlineStatus === 'soon') && (
+                        <span className={cn('font-semibold', deadlineStatus === 'soon' ? 'text-amber-600' : 'text-emerald-700')}>
+                          残り{deadlineDaysLeft}日
                         </span>
                       )}
                     </span>

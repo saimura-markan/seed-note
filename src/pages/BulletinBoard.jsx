@@ -25,6 +25,7 @@ function ManualFileIcon({ mimeType }) {
 }
 
 const SUPERIOR_ROLES = ['director', 'executive', 'admin']
+const MANUAL_SUBMIT_ROLES = ['manager', 'director', 'executive', 'admin']
 
 const BULLETIN_CATEGORIES = ['標準化不足', '教育不足', 'ルール未整備', 'システム不備', '顧客確認不足', '引継ぎ不足', 'マネジメント不足', '人員配置問題']
 const BULLETIN_PERIODS = [
@@ -142,10 +143,10 @@ function BulletinCard({ post, currentUser, tick }) {
     actionProgress === '進行中' ? 'bg-blue-100 text-blue-700'       :
                                   'bg-stone-100 text-stone-600'
 
-  // 提出マニュアル（担当者本人 or director以上のみ提出・削除可。閲覧・DLは誰でも可）
+  // 提出マニュアル（提出はmanager以上・削除は自分がアップした分 or director以上。閲覧・DLは誰でも可）
   const [manuals, setManuals] = useState(post.manuals || [])
   const [uploadingManualCount, setUploadingManualCount] = useState(0)
-  const canSubmitManual = isAssignee || isSuperior
+  const canSubmitManual = MANUAL_SUBMIT_ROLES.includes(userRole)
 
   const handleManualSelect = async (e) => {
     const files = Array.from(e.target.files || [])

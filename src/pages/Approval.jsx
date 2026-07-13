@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, CheckCircle, XCircle, Clock } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, getRole } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 
 // ─── 定数 ───────────────────────────────────────────────────────────────────
@@ -28,6 +28,12 @@ const ROOT_THEME_COLORS = {
   'その他':     'bg-stone-400',
 }
 
+const APPROVER_EMAIL = {
+  '斎村 直樹':   'saimura@markan.co.jp',
+  '小笠原 久幸': 'ogasahara@markan.co.jp',
+  '榮藤 美香':   'jimu@markan.co.jp',
+}
+
 // ─── ヘルパー ─────────────────────────────────────────────────────────────────
 
 function fmtDateTime(iso) {
@@ -45,6 +51,21 @@ function calcCountdown(submittedAt) {
   const m = Math.floor((remaining % 3600) / 60)
   const s = Math.floor(remaining % 60)
   return { label: `${pad(h)}:${pad(m)}:${pad(s)}`, overdue: false }
+}
+
+function TimelineEntry({ log }) {
+  const isRejected = log.type === 'approval_rejected'
+  return (
+    <div className={cn('rounded-xl border px-3 py-2.5', isRejected ? 'bg-red-50 border-red-100' : 'bg-stone-50 border-stone-100')}>
+      <div className="flex items-center justify-between mb-1">
+        <span className={cn('text-xs font-semibold', isRejected ? 'text-red-700' : 'text-gray-600')}>
+          {log.author_name || '—'}{isRejected ? 'が差し戻しました' : 'のコメント'}
+        </span>
+        <span className="text-xs text-gray-400">{fmtDateTime(log.created_at)}</span>
+      </div>
+      <p className="text-sm text-gray-700 whitespace-pre-wrap">{log.content || '（コメントなし）'}</p>
+    </div>
+  )
 }
 
 function ProgressBar({ status }) {
@@ -116,6 +137,10 @@ export default function Approval() {
   const [currentUser,        setCurrentUser]        = useState(null)
   const [rejectModalOpen,    setRejectModalOpen]    = useState(false)
   const [rejectTarget,       setRejectTarget]       = useState(null)
+  const [approvalTimeline,       setApprovalTimeline]       = useState([])
+  const [showPastTimeline,       setShowPastTimeline]       = useState(false)
+  const [newApprovalComment,     setNewApprovalComment]     = useState('')
+  const [sendingApprovalComment, setSendingApprovalComment] = useState(false)
 
   useEffect(() => {
     const t = setInterval(() => setTick(n => n + 1), 1000)
@@ -158,6 +183,7 @@ export default function Approval() {
       const snapLog = logs.filter(l => l.type === 'deep_revision_snapshot').pop()
       if (snapLog) { try { setRevisionSnapshot(JSON.parse(snapLog.content)) } catch {} }
       setNegotiationReplies(logs.filter(l => l.type === 'negotiation_reply'))
+      setApprovalTimeline(logs.filter(l => l.type === 'approval_rejected' || l.type === 'approval_comment'))
     }
     if (corr && corr[0]) setCorrection(corr[0])
     setLoading(false)
@@ -166,6 +192,7 @@ export default function Approval() {
   useEffect(() => { fetchData() }, [fetchData])
 
   const handleApproval = async (approvalId, status, type = null) => {
+    const approverRow = approvals.find(a => a.id === approvalId)
     setSaving(s => ({ ...s, [approvalId]: true }))
     await supabase.from('complaint_approvals').update({
       status,
@@ -186,6 +213,12 @@ export default function Approval() {
       setComplaint(c => ({ ...c, status: nextStatus }))
       setRejectModalOpen(false)
       setRejectTarget(null)
+
+      const { data: logEntry } = await supabase.from('complaint_logs').insert({
+        complaint_id: id, type: 'approval_rejected',
+        content: comments[approvalId] || '', author_name: approverRow?.approver_name || '',
+      }).select().single()
+      if (logEntry) setApprovalTimeline(prev => [...prev, logEntry])
     }
 
     // 全員承認済みなら complaint を完了に
@@ -241,6 +274,20 @@ export default function Approval() {
     setSaving(s => ({ ...s, [approvalId]: false }))
   }
 
+  const handleApprovalComment = async () => {
+    if (!newApprovalComment.trim()) return
+    setSendingApprovalComment(true)
+    const authorName = Object.entries(APPROVER_EMAIL).find(([, email]) => email === currentUser?.email)?.[0]
+      || currentUser?.user_metadata?.full_name || currentUser?.user_metadata?.name || currentUser?.email || ''
+    const { data, error } = await supabase.from('complaint_logs').insert({
+      complaint_id: id, type: 'approval_comment', content: newApprovalComment.trim(), author_name: authorName,
+    }).select().single()
+    setSendingApprovalComment(false)
+    if (error) { alert(`送信に失敗しました: ${error.message}`); return }
+    if (data) setApprovalTimeline(prev => [...prev, data])
+    setNewApprovalComment('')
+  }
+
   if (loading) return (
     <div className="flex items-center justify-center py-32 text-gray-400">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mr-3" />読み込み中...
@@ -254,6 +301,11 @@ export default function Approval() {
   const countdown = calcCountdown(analysis?.created_at)
   const allApproved = approvals.length > 0 && approvals.every(a => a.status === 'approved')
   const totalTheme = Object.values(themeStats).reduce((s, v) => s + v, 0) || 1
+  const userRole = getRole(currentUser)
+  const myApproval = approvals.find(a => APPROVER_EMAIL[a.approver_name] === currentUser?.email)
+  const canComment = userRole === 'admin' || (!!myApproval && myApproval.status !== 'approved')
+  const sortedTimeline = [...approvalTimeline].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  const [latestTimelineEntry, ...pastTimelineEntries] = sortedTimeline
 
   return (
     <div className="px-6 py-6 max-w-6xl mx-auto">
@@ -433,11 +485,7 @@ export default function Approval() {
           const done     = appr.status === 'approved'
           const rejected = appr.status === 'rejected'
           const pending  = appr.status === 'pending'
-          const userDisplayName = currentUser?.user_metadata?.full_name
-            || currentUser?.user_metadata?.name
-            || currentUser?.email
-            || ''
-          const isMyCard = userDisplayName.includes(appr.approver_name)
+          const isMyCard = currentUser?.email === APPROVER_EMAIL[appr.approver_name]
           const displayRole = appr.approver_name === '斎村' ? '専務取締役' : appr.approver_role
           return (
             <div key={appr.id} className={cn(
@@ -515,6 +563,52 @@ export default function Approval() {
             </div>
           )
         })}
+      </div>
+
+      {/* ②.5 差し戻し履歴・コメント */}
+      <div className="bg-white rounded-2xl shadow-sm mb-5 overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-stone-100 bg-stone-50">
+          <span className="text-sm font-bold text-gray-700">💬 差し戻し履歴・コメント</span>
+        </div>
+        <div className="p-5">
+          {sortedTimeline.length === 0 && (
+            <p className="text-sm text-gray-400 italic mb-4">まだ履歴はありません</p>
+          )}
+          {latestTimelineEntry && (
+            <div className="space-y-2 mb-4">
+              <TimelineEntry log={latestTimelineEntry} />
+              {pastTimelineEntries.length > 0 && (
+                <>
+                  <button
+                    onClick={() => setShowPastTimeline(v => !v)}
+                    className="text-xs text-gray-400 hover:text-gray-600 font-semibold"
+                  >
+                    {showPastTimeline ? '過去の履歴を閉じる' : `過去の履歴を表示（${pastTimelineEntries.length}件）`}
+                  </button>
+                  {showPastTimeline && pastTimelineEntries.map(log => <TimelineEntry key={log.id} log={log} />)}
+                </>
+              )}
+            </div>
+          )}
+          {canComment && (
+            <div className="space-y-2 pt-3 border-t border-stone-100">
+              <textarea
+                value={newApprovalComment}
+                onChange={e => setNewApprovalComment(e.target.value)}
+                rows={2}
+                placeholder="コメントを入力してください"
+                className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition resize-none"
+              />
+              <button
+                onClick={handleApprovalComment}
+                disabled={sendingApprovalComment || !newApprovalComment.trim()}
+                className="px-4 h-9 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold transition-colors disabled:opacity-50"
+              >
+                {sendingApprovalComment ? '送信中...' : 'コメントする'}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ③ 今月の根源テーマ集計 */}

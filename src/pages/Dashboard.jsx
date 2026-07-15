@@ -148,11 +148,18 @@ function mapRow(row) {
     department:           row.department     ?? '',
     clientContact:        row.client_contact ?? '',
     currentTurnStartedAt: row.current_turn_started_at ? new Date(row.current_turn_started_at).getTime() : null,
+    supervisorReportedAt: row.supervisor_reported_at  ? new Date(row.supervisor_reported_at).getTime()  : null,
+    supervisorApprovedAt: row.supervisor_approved_at  ? new Date(row.supervisor_approved_at).getTime()  : null,
     isMine:               false,
   }
 }
 
 const pad = n => String(Math.floor(Math.abs(n))).padStart(2, '0')
+
+function fmtStepDate(ms) {
+  if (!ms) return null
+  return new Date(ms).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })
+}
 
 function calcTimer(receivedAt, deadlineMinutes) {
   const remaining = (deadlineMinutes * 60 * 1000 - (Date.now() - receivedAt)) / 1000
@@ -181,15 +188,19 @@ function StatCard({ label, value, sub, icon: Icon, iconBg, iconColor, valueColor
   )
 }
 
-function StepProgressBar({ status }) {
-  const stepIndex = STATUS_TO_STEP[status] ?? 0
+function StepProgressBar({ status, receivedAt, supervisorReportedAt, supervisorApprovedAt, currentTurnStartedAt }) {
+  const stepIndex  = STATUS_TO_STEP[status] ?? 0
+  const isApproved = status === '承認完了'
+  const lastIndex  = STATUS_FLOW_STEPS.length - 1
+  // 改善報告・深掘りは専用の完了日時カラムが無いため常に空欄
+  const stepDates = [receivedAt, supervisorReportedAt, supervisorApprovedAt, null, null, currentTurnStartedAt]
   return (
     <div className="mt-3">
       <div className="flex items-center">
         {STATUS_FLOW_STEPS.map((step, i) => {
           const completed = i < stepIndex
           const current   = i === stepIndex
-          const isLast    = i === STATUS_FLOW_STEPS.length - 1
+          const isLast    = i === lastIndex
           const dotCls    = completed ? 'bg-[#1D9E75]' : current ? step.dotColor : 'bg-stone-200'
           return (
             <div key={i} className={cn('flex items-center', isLast ? '' : 'flex-1')}>
@@ -211,6 +222,18 @@ function StepProgressBar({ status }) {
               completed ? 'text-[#1D9E75]' : current ? step.textColor : 'text-stone-300'
             )}>
               {step.label}
+            </span>
+          )
+        })}
+      </div>
+      <div className="flex justify-between mt-0.5">
+        {STATUS_FLOW_STEPS.map((step, i) => {
+          // 最終ステップ(承認)は i < stepIndex が構造上成立しないため、'承認完了'到達時を完了扱いにする
+          const done = i < stepIndex || (i === lastIndex && isApproved)
+          const dateLabel = done ? fmtStepDate(stepDates[i]) : null
+          return (
+            <span key={i} className="text-[8px] text-stone-400">
+              {dateLabel ?? '—'}
             </span>
           )
         })}
@@ -278,7 +301,13 @@ function ComplaintCard({ c, onClick, firstContactMin, role, deepAnalysis }) {
             <span>施工：{c.worker}</span>
             <span className="text-gray-400">・期限 {c.deadlineMinutes}分</span>
           </div>
-          <StepProgressBar status={c.status} />
+          <StepProgressBar
+            status={c.status}
+            receivedAt={c.receivedAt}
+            supervisorReportedAt={c.supervisorReportedAt}
+            supervisorApprovedAt={c.supervisorApprovedAt}
+            currentTurnStartedAt={c.currentTurnStartedAt}
+          />
         </div>
 
         {/* Timer + Status */}
@@ -370,7 +399,13 @@ function StatusComplaintCard({ c, onClick, role }) {
         </span>
       </div>
 
-      <StepProgressBar status={c.status} />
+      <StepProgressBar
+        status={c.status}
+        receivedAt={c.receivedAt}
+        supervisorReportedAt={c.supervisorReportedAt}
+        supervisorApprovedAt={c.supervisorApprovedAt}
+        currentTurnStartedAt={c.currentTurnStartedAt}
+      />
 
       <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-stone-100">
         <div className="flex items-center gap-2 min-w-0">

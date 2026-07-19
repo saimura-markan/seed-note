@@ -137,6 +137,17 @@ export default function RootAnalysisForm() {
       alert(`保存に失敗しました: ${saveError.message}`)
       return
     }
+    const APPROVERS = [
+      { approver_name: '斎村 直樹',   approver_role: '専務取締役',           sort_order: 0 },
+      { approver_name: '小笠原 久幸', approver_role: '常務取締役',           sort_order: 1 },
+      { approver_name: '榮藤 美香',   approver_role: '取締役 品質管理責任者', sort_order: 2 },
+    ]
+    const { data: existingApprovals, error: approvalsFetchError } = await supabase.from('complaint_approvals').select('id').eq('complaint_id', id)
+    if (approvalsFetchError) console.error('[RootAnalysisForm] complaint_approvals fetch error:', approvalsFetchError.message)
+    if (!existingApprovals || existingApprovals.length === 0) {
+      const { error: approvalsInsertError } = await supabase.from('complaint_approvals').insert(APPROVERS.map(a => ({ complaint_id: id, ...a, status: 'pending' })))
+      if (approvalsInsertError) console.error('[RootAnalysisForm] complaint_approvals insert error:', approvalsInsertError.message)
+    }
     const { error: statusError } = await supabase.from('complaints').update({
       status: '原因分析提出', current_turn_started_at: new Date().toISOString(),
     }).eq('id', id)

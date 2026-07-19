@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, CheckCircle, XCircle, Clock } from 'lucide-react'
 import { cn, getRole } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
+import { ROOT_THEMES, ROOT_THEME_COLORS } from '@/lib/constants'
 
 // ─── 定数 ───────────────────────────────────────────────────────────────────
 
@@ -18,14 +19,6 @@ function statusToStep(status) {
     '承認完了': 6,
   }
   return map[status] ?? 0
-}
-
-const ROOT_THEME_COLORS = {
-  '標準化不足': 'bg-blue-500',
-  '教育不足':   'bg-amber-500',
-  '報告不足':   'bg-orange-500',
-  '顧客視点不足': 'bg-red-500',
-  'その他':     'bg-stone-400',
 }
 
 const APPROVER_EMAIL = {
@@ -615,7 +608,7 @@ export default function Approval() {
       <div className="bg-white rounded-2xl shadow-sm mb-8 p-5">
         <p className="text-sm font-bold text-gray-800 mb-4">📊 今月の根源テーマ集計</p>
         <div className="space-y-3">
-          {['標準化不足', '教育不足', '報告不足', '顧客視点不足', 'その他'].map(theme => {
+          {ROOT_THEMES.map(theme => {
             const count = themeStats[theme] || 0
             const pct   = Math.round((count / totalTheme) * 100)
             return (

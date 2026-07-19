@@ -6,6 +6,7 @@ import {
   cn,
   getDeadlineStatus, getDaysOverdue, getDaysRemaining, getTodayDateStr, DEADLINE_STATUS_STYLES,
 } from '@/lib/utils'
+import { ROOT_THEMES as BULLETIN_CATEGORIES } from '@/lib/constants'
 
 const MANUAL_BUCKET = 'seed-manuals'
 const MANUAL_MAX_SIZE = 20 * 1024 * 1024 // 20MB
@@ -27,7 +28,6 @@ function ManualFileIcon({ mimeType }) {
 const SUPERIOR_ROLES = ['director', 'executive', 'admin']
 const MANUAL_SUBMIT_ROLES = ['manager', 'director', 'executive', 'admin']
 
-const BULLETIN_CATEGORIES = ['標準化不足', '教育不足', 'ルール未整備', 'システム不備', '顧客確認不足', '引継ぎ不足', 'マネジメント不足', '人員配置問題']
 const BULLETIN_PERIODS = [
   { id: 'all', label: '全て' },
   { id: '1m',  label: '直近1ヶ月' },

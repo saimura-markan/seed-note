@@ -19,6 +19,20 @@ function statusToStep(status) {
   return map[status] ?? 0
 }
 
+// workflow_version = 2（原因分析・改善報告書を1ステップに統合した新フロー）専用
+const NEW_STEPS = ['受付', '対応中', '事業責任者確認', '原因分析・改善報告書', '役員承認', '周知完了']
+
+function newStatusToStep(status) {
+  const map = {
+    '受付済': 0,
+    '対応中': 1,
+    '是正案提出': 2, '是正案差し戻し': 2, '是正案再提出': 2, '是正案承認': 2,
+    '原因分析提出': 4, '原因分析差し戻し': 4,
+    '承認完了': 5,
+  }
+  return map[status] ?? 0
+}
+
 const PRIORITY = {
   5: { label: '最高緊張', bg: 'bg-red-100',    text: 'text-red-700',    border: 'border-l-red-400' },
   4: { label: '緊張',     bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-l-orange-400' },
@@ -46,12 +60,13 @@ function fmtDateTimeWithElapsed(iso, baseIso) {
   return `${fmtDateTime(iso)} (+${elapsedMin}分)`
 }
 
-function ProgressBar({ status }) {
-  const step = statusToStep(status)
+function ProgressBar({ status, workflowVersion }) {
+  const steps = workflowVersion === 2 ? NEW_STEPS : STEPS
+  const step = workflowVersion === 2 ? newStatusToStep(status) : statusToStep(status)
   return (
     <div className="bg-white rounded-2xl shadow-sm px-6 py-4 mb-5">
       <div className="flex items-center gap-0">
-        {STEPS.map((s, i) => {
+        {steps.map((s, i) => {
           const done = i < step; const current = i === step
           return (
             <div key={s} className="flex items-center flex-1 min-w-0">
@@ -69,7 +84,7 @@ function ProgressBar({ status }) {
                   {s}
                 </span>
               </div>
-              {i < STEPS.length - 1 && (
+              {i < steps.length - 1 && (
                 <div className={cn('flex-1 h-0.5 mx-1 mt-[-14px]', done ? 'bg-emerald-500' : 'bg-stone-200')} />
               )}
             </div>
@@ -124,6 +139,7 @@ export default function ComplaintOverview() {
   const [reportLog,           setReportLog]           = useState(null)
   const [supervisorCommentLogs, setSupervisorCommentLogs] = useState([])
   const [deepAnalysis,        setDeepAnalysis]        = useState(null)
+  const [rootAnalysis,        setRootAnalysis]        = useState(null)
   const [approvals,    setApprovals]    = useState([])
   const [latestCorrectionReply, setLatestCorrectionReply] = useState(null)
   const [replyText,    setReplyText]    = useState('')
@@ -134,6 +150,9 @@ export default function ComplaintOverview() {
   const [negotiationComment,    setNegotiationComment]    = useState('')
   const [negotiationSending,    setNegotiationSending]    = useState(false)
   const [negotiationReplies,    setNegotiationReplies]    = useState([])
+  // 原因分析・改善報告書（workflow_version=2）専用：役員再協議の返答フォーム
+  const [rootNegotiationComment, setRootNegotiationComment] = useState('')
+  const [rootNegotiationSending, setRootNegotiationSending] = useState(false)
   const [correctionRejectedLog, setCorrectionRejectedLog] = useState(null)
   const [userRole,     setUserRole]     = useState(null)
   const [currentUser,  setCurrentUser]  = useState(null)
@@ -171,11 +190,12 @@ export default function ComplaintOverview() {
   }, [])
 
   const fetchData = useCallback(async () => {
-    const [{ data: c }, { data: logs }, { data: corr }, { data: deep }, { data: appr }, { data: photoRows }] = await Promise.all([
+    const [{ data: c }, { data: logs }, { data: corr }, { data: deep }, { data: root }, { data: appr }, { data: photoRows }] = await Promise.all([
       supabase.from('complaints').select('*').eq('id', id).maybeSingle(),
       supabase.from('complaint_logs').select('*').eq('complaint_id', id).order('created_at'),
       supabase.from('complaint_corrections').select('*').eq('complaint_id', id).order('created_at').limit(1),
       supabase.from('complaint_deep_analysis').select('*').eq('complaint_id', id).order('created_at').limit(1),
+      supabase.from('complaint_root_analysis').select('*').eq('complaint_id', id).order('created_at', { ascending: false }).limit(1),
       supabase.from('complaint_approvals').select('status, approver_name, approver_role, comment, approved_at').eq('complaint_id', id).order('sort_order'),
       supabase.from('complaint_photos').select('*').eq('complaint_id', id).order('created_at'),
     ])
@@ -198,6 +218,7 @@ export default function ComplaintOverview() {
     }
     if (corr && corr[0]) setCorrection(corr[0])
     if (deep && deep[0]) setDeepAnalysis(deep[0])
+    if (root && root[0]) setRootAnalysis(root[0])
     if (appr) setApprovals(appr)
     if (photoRows) await loadPhotosWithUrls(photoRows)
     console.log('[ComplaintOverview] fetchData:', {
@@ -282,6 +303,25 @@ export default function ComplaintOverview() {
     fetchData()
   }
 
+  // 原因分析・改善報告書（workflow_version=2）専用：役員再協議の返答
+  const handleRootAnalysisNegotiationReply = async () => {
+    if (!rootNegotiationComment.trim()) return
+    setRootNegotiationSending(true)
+    await supabase.from('complaint_logs').insert({
+      complaint_id: id, type: 'negotiation_reply', content: rootNegotiationComment.trim(),
+    })
+    await supabase.from('complaint_approvals')
+      .update({ status: 'pending', approved_at: null })
+      .eq('complaint_id', id)
+      .eq('status', 'rejected')
+    await supabase.from('complaints').update({
+      status: '原因分析提出', current_turn_started_at: new Date().toISOString(),
+    }).eq('id', id)
+    setRootNegotiationSending(false)
+    setRootNegotiationComment('')
+    fetchData()
+  }
+
   // 削除（論理削除・admin限定）
   const handleDelete = async () => {
     if (!window.confirm('このクレームを一覧から削除します。よろしいですか？')) return
@@ -358,7 +398,11 @@ export default function ComplaintOverview() {
   const step4Locked = !PAST_STEP4.includes(complaint.status)
   const step5Locked = !PAST_STEP5.includes(complaint.status)
   const step6Locked = !PAST_STEP6.includes(complaint.status)
-  const step7Locked = !deepAnalysis
+  const step7Locked = complaint.workflow_version === 2 ? !rootAnalysis : !deepAnalysis
+
+  // workflow_version = 2（原因分析・改善報告書 統合ステップ）専用
+  const PAST_MERGED_STEP = ['是正案承認', '原因分析提出', '原因分析差し戻し', '承認完了']
+  const mergedStepLocked = !PAST_MERGED_STEP.includes(complaint.status)
 
   return (
     <div className="px-6 py-6 max-w-6xl mx-auto">
@@ -377,7 +421,7 @@ export default function ComplaintOverview() {
 
       <h2 className="text-lg font-bold text-gray-900 mb-1">クレーム詳細</h2>
 
-      <ProgressBar status={complaint.status} />
+      <ProgressBar status={complaint.status} workflowVersion={complaint.workflow_version} />
 
       {/* 基本情報 */}
       <div className={cn('bg-white rounded-2xl shadow-sm mb-5 p-5 border-l-4', pc.border)}>
@@ -755,6 +799,9 @@ export default function ComplaintOverview() {
           </div>
         )}
 
+        {/* ⑤ 改善報告書 ／ ⑥ 深掘り分析（workflow_version = 1 の既存フローのみ。新フローは下の統合カードで表示） */}
+        {complaint.workflow_version !== 2 && (
+        <>
         {/* ⑤ 改善報告書 */}
         {step5Locked ? <LockedStep num="5" title="改善報告書" /> : (
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 border-l-lime-400">
@@ -918,8 +965,81 @@ export default function ComplaintOverview() {
           )}
         </div>
         )}
+        </>
+        )}
 
-        {/* ⑦ 役員承認 */}
+        {/* ⑤+⑥ 原因分析・改善報告書（workflow_version = 2 の新フロー専用・統合ステップ） */}
+        {complaint.workflow_version === 2 && (
+          mergedStepLocked ? <LockedStep num="5" title="原因分析・改善報告書" /> : (
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 border-l-lime-400">
+            <div className="px-5 py-3.5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={cn('w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold', rootAnalysis ? 'bg-emerald-500 text-white' : 'bg-stone-200 text-stone-500')}>5</div>
+                <span className="text-sm font-bold text-gray-800">原因分析・改善報告書</span>
+              </div>
+              {complaint.status === '原因分析差し戻し'
+                ? <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-100 text-red-700">否認・修正待ち</span>
+                : <span className={cn('text-xs font-bold px-2.5 py-1 rounded-full', rootAnalysis ? 'bg-emerald-100 text-emerald-700' : 'text-stone-400')}>{rootAnalysis ? '提出済' : '未記録'}</span>
+              }
+            </div>
+            <div className="mx-5 mb-4 bg-stone-50 rounded-xl px-4 py-3">
+              {rootAnalysis ? (
+                <div className="space-y-2 text-sm text-gray-700">
+                  {rootAnalysis.occurred_event_note && <p><span className="font-semibold text-gray-500 text-xs">発生した事象：</span>{rootAnalysis.occurred_event_note}</p>}
+                  {rootAnalysis.correction        && <p><span className="font-semibold text-gray-500 text-xs">実施した是正措置：</span>{rootAnalysis.correction}</p>}
+                  {rootAnalysis.root_cause        && <p><span className="font-semibold text-gray-500 text-xs">特定した真因：</span>{rootAnalysis.root_cause}</p>}
+                  {rootAnalysis.root_theme        && <p><span className="font-semibold text-gray-500 text-xs">真因カテゴリー：</span>{rootAnalysis.root_theme}</p>}
+                  {rootAnalysis.improvement       && <p><span className="font-semibold text-gray-500 text-xs">改善策：</span>{rootAnalysis.improvement}</p>}
+                  {rootAnalysis.action_assignee   && <p><span className="font-semibold text-gray-500 text-xs">担当者：</span>{rootAnalysis.action_assignee}</p>}
+                  {rootAnalysis.action_deadline   && <p><span className="font-semibold text-gray-500 text-xs">期限：</span>{rootAnalysis.action_deadline}</p>}
+                  {rootAnalysis.action_progress   && <p><span className="font-semibold text-gray-500 text-xs">進捗：</span>{rootAnalysis.action_progress}</p>}
+                  {Array.isArray(rootAnalysis.horizontal_departments) && rootAnalysis.horizontal_departments.length > 0 && (
+                    <p><span className="font-semibold text-gray-500 text-xs">横展開 対象部署：</span>{rootAnalysis.horizontal_departments.join('・')}</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">原因分析・改善報告書の提出待ちです。</p>
+              )}
+            </div>
+            {complaint.status === '原因分析差し戻し' && (() => {
+              const rejectedApproval = approvals.find(a => a.status === 'rejected')
+              return (
+                <div className="mx-5 mb-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                  <p className="text-xs font-semibold text-red-700 mb-2">
+                    ⚠️ {rejectedApproval ? `${rejectedApproval.approver_name}より差し戻しがありました` : '役員から差し戻しがありました'}
+                  </p>
+                  {rejectedApproval?.comment && (
+                    <p className="text-sm text-gray-700 bg-white rounded-lg px-3 py-2 mb-2 border border-red-100">
+                      コメント：「{rejectedApproval.comment}」
+                    </p>
+                  )}
+                  <p className="text-sm text-gray-500">内容を修正して再提出してください。</p>
+                </div>
+              )
+            })()}
+            {['manager', 'director', 'admin'].includes(userRole) && !rootAnalysis && complaint.status === '是正案承認' && (
+              <div className="mx-5 mb-4">
+                <button onClick={() => navigate(`/complaints/${id}/root-analysis`)}
+                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition-colors">
+                  原因分析・改善報告書を作成する →
+                </button>
+              </div>
+            )}
+            {['manager', 'director', 'admin'].includes(userRole) && complaint.status === '原因分析差し戻し' && (
+              <div className="mx-5 mb-4">
+                <button onClick={() => navigate(`/complaints/${id}/root-analysis`)}
+                  className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold transition-colors">
+                  原因分析・改善報告書を修正する →
+                </button>
+              </div>
+            )}
+          </div>
+          )
+        )}
+
+        {/* ⑦ 役員承認（workflow_version = 1 の既存フローのみ。新フローは下の同等カードで表示） */}
+        {complaint.workflow_version !== 2 && (
+        <>
         {(step7Locked && userRole !== 'admin') ? <LockedStep num="7" title="役員承認" /> : (
         <div className={cn('bg-white rounded-2xl shadow-sm overflow-hidden border-l-4', complaint.status === '役員再協議' ? 'border-l-orange-400' : 'border-l-emerald-400')}>
           <div className="px-5 py-3.5 flex items-center justify-between">
@@ -1006,6 +1126,99 @@ export default function ComplaintOverview() {
             )}
           </div>
         </div>
+        )}
+        </>
+        )}
+
+        {/* ⑦ 役員承認（workflow_version = 2 の新フロー専用） */}
+        {complaint.workflow_version === 2 && (
+        (step7Locked && userRole !== 'admin') ? <LockedStep num="6" title="役員承認" /> : (
+        <div className={cn('bg-white rounded-2xl shadow-sm overflow-hidden border-l-4', complaint.status === '原因分析差し戻し' ? 'border-l-orange-400' : 'border-l-emerald-400')}>
+          <div className="px-5 py-3.5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className={cn('w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold', approvals.length > 0 && approvedCount === approvals.length ? 'bg-emerald-500 text-white' : complaint.status === '原因分析差し戻し' ? 'bg-orange-400 text-white' : 'bg-stone-200 text-stone-500')}>6</div>
+              <span className="text-sm font-bold text-gray-800">役員承認記録</span>
+            </div>
+            <span className={cn('text-xs font-bold px-2.5 py-1 rounded-full', approvals.length > 0 && approvedCount === approvals.length ? 'bg-emerald-100 text-emerald-700' : complaint.status === '原因分析差し戻し' ? 'bg-orange-100 text-orange-700' : 'text-stone-400')}>
+              {complaint.status === '原因分析差し戻し' ? '再協議中' : approvals.length > 0 && approvedCount === approvals.length ? '承認済' : approvals.length > 0 ? `${approvedCount}/${approvals.length}名承認` : '承認待ち'}
+            </span>
+          </div>
+          {complaint.status === '原因分析差し戻し' && (
+            <div className="mx-5 mb-3 bg-orange-50 rounded-xl px-4 py-3">
+              <p className="text-xs font-semibold text-orange-700 mb-2">⚠️ 役員から否認がありました。返答・修正コメントを送信してください。</p>
+              {approvals.filter(a => a.status === 'rejected').map((a, i) => (
+                <div key={i} className="bg-white rounded-xl border border-orange-200 px-3 py-2 mb-2 last:mb-0">
+                  <p className="text-xs font-semibold text-red-600 mb-0.5">
+                    {a.approver_name}（{a.approver_role}）さんが否認しました
+                  </p>
+                  <p className="text-sm text-gray-700">否認理由：{a.comment || '（コメントなし）'}</p>
+                </div>
+              ))}
+              {negotiationReplies.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-orange-100">
+                  <p className="text-xs text-orange-600 font-semibold mb-1">過去の返答：</p>
+                  {negotiationReplies.map((r, i) => (
+                    <p key={i} className="text-xs text-gray-600 bg-white rounded-lg px-2 py-1 mb-1">{r.content}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {complaint.status === '原因分析差し戻し' && ['manager', 'director', 'admin'].includes(userRole) && (
+            <div className="mx-5 mb-3 space-y-2">
+              <textarea
+                value={rootNegotiationComment}
+                onChange={e => setRootNegotiationComment(e.target.value)}
+                rows={3}
+                placeholder="返答・修正コメントを入力してください（否認した役員に届きます）"
+                className="w-full px-3 py-2.5 rounded-xl border border-orange-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-400 transition resize-none"
+              />
+              <button
+                onClick={handleRootAnalysisNegotiationReply}
+                disabled={rootNegotiationSending || !rootNegotiationComment.trim()}
+                className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold transition-colors disabled:opacity-40">
+                {rootNegotiationSending ? '送信中...' : '返答して再提出 →'}
+              </button>
+            </div>
+          )}
+          {['executive', 'admin'].includes(userRole) && rootAnalysis && complaint.status === '原因分析提出' && !(approvals.length > 0 && approvedCount === approvals.length) && (() => {
+            const displayName = currentUser?.user_metadata?.full_name || currentUser?.user_metadata?.name || currentUser?.email || ''
+            const alreadyApproved = approvals.some(a => displayName.includes(a.approver_name) && a.status === 'approved')
+            return (
+              <div className="mx-5 mb-3">
+                <button
+                  onClick={() => navigate(`/complaints/${id}/approval`)}
+                  disabled={alreadyApproved}
+                  className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                  {alreadyApproved ? '承認済みです' : '役員承認を行う →'}
+                </button>
+              </div>
+            )
+          })()}
+          <div className="mx-5 mb-4 bg-stone-50 rounded-xl px-4 py-3">
+            {approvals.length > 0 ? (
+              <div className="space-y-2">
+                {approvals.map((a, i) => (
+                  <div key={i} className="flex items-center justify-between py-2 border-b border-stone-100 last:border-0">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-stone-200 text-stone-600 flex items-center justify-center text-xs font-bold">{a.approver_name?.charAt(0)}</div>
+                      <div>
+                        <span className="text-sm text-gray-700">{a.approver_name}</span>
+                        {a.approver_role && <p className="text-xs text-gray-400">{a.approver_role}</p>}
+                      </div>
+                    </div>
+                    <span className={cn('text-xs font-bold px-2.5 py-1 rounded-full', a.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-stone-100 text-stone-500')}>
+                      {a.status === 'approved' ? `承認済 ${fmtDateTime(a.approved_at)}` : '承認待ち'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">役員承認の完了後に公開されます。</p>
+            )}
+          </div>
+        </div>
+        )
         )}
 
       </div>

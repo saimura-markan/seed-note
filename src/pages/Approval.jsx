@@ -21,6 +21,20 @@ function statusToStep(status) {
   return map[status] ?? 0
 }
 
+// workflow_version = 2（原因分析・改善報告書を1ステップに統合した新フロー）専用
+const NEW_STEPS = ['受付', '対応中', '事業責任者確認', '原因分析・改善報告書', '役員承認', '周知完了']
+
+function newStatusToStep(status) {
+  const map = {
+    '受付済': 0,
+    '対応中': 1,
+    '是正案提出': 2, '是正案差し戻し': 2, '是正案再提出': 2, '是正案承認': 2,
+    '原因分析提出': 4, '原因分析差し戻し': 4,
+    '承認完了': 5,
+  }
+  return map[status] ?? 0
+}
+
 const APPROVER_EMAIL = {
   '斎村 直樹':   'saimura@markan.co.jp',
   '小笠原 久幸': 'ogasahara@markan.co.jp',
@@ -61,12 +75,13 @@ function TimelineEntry({ log }) {
   )
 }
 
-function ProgressBar({ status }) {
-  const step = statusToStep(status)
+function ProgressBar({ status, workflowVersion }) {
+  const steps = workflowVersion === 2 ? NEW_STEPS : STEPS
+  const step = workflowVersion === 2 ? newStatusToStep(status) : statusToStep(status)
   return (
     <div className="bg-white rounded-2xl shadow-sm px-6 py-4 mb-5">
       <div className="flex items-center gap-0">
-        {STEPS.map((s, i) => {
+        {steps.map((s, i) => {
           const done = i < step; const current = i === step
           return (
             <div key={s} className="flex items-center flex-1 min-w-0">
@@ -82,7 +97,7 @@ function ProgressBar({ status }) {
                   {s}
                 </span>
               </div>
-              {i < STEPS.length - 1 && (
+              {i < steps.length - 1 && (
                 <div className={cn('flex-1 h-0.5 mx-1 mt-[-14px]', done ? 'bg-emerald-500' : 'bg-stone-200')} />
               )}
             </div>
@@ -112,6 +127,7 @@ export default function Approval() {
 
   const [complaint,  setComplaint]  = useState(null)
   const [analysis,   setAnalysis]   = useState(null)
+  const [rootAnalysis, setRootAnalysis] = useState(null)
   const [approvals,  setApprovals]  = useState([])
   const [themeStats, setThemeStats] = useState({})
   const [, setTick] = useState(0)
@@ -147,9 +163,10 @@ export default function Approval() {
   }, [])
 
   const fetchData = useCallback(async () => {
-    const [{ data: c }, { data: deep }, { data: appr }, { data: stats }, { data: logs }, { data: corr }] = await Promise.all([
+    const [{ data: c }, { data: deep }, { data: root }, { data: appr }, { data: stats }, { data: logs }, { data: corr }] = await Promise.all([
       supabase.from('complaints').select('*').eq('id', id).maybeSingle(),
       supabase.from('complaint_deep_analysis').select('*').eq('complaint_id', id).order('created_at').limit(1),
+      supabase.from('complaint_root_analysis').select('*').eq('complaint_id', id).order('created_at', { ascending: false }).limit(1),
       supabase.from('complaint_approvals').select('*').eq('complaint_id', id).order('sort_order'),
       supabase.from('complaint_deep_analysis').select('root_theme'),
       supabase.from('complaint_logs').select('*').eq('complaint_id', id).order('created_at'),
@@ -157,6 +174,7 @@ export default function Approval() {
     ])
     if (c) setComplaint(c)
     if (deep && deep[0]) setAnalysis(deep[0])
+    if (root && root[0]) setRootAnalysis(root[0])
     if (appr) {
       setApprovals(appr)
       const init = {}
@@ -199,7 +217,7 @@ export default function Approval() {
 
     // 否認時は complaint を差し戻しに
     if (status === 'rejected') {
-      const nextStatus = type === 'report' ? 'report_rejected' : '役員再協議'
+      const nextStatus = type === 'root_analysis' ? '原因分析差し戻し' : type === 'report' ? 'report_rejected' : '役員再協議'
       await supabase.from('complaints').update({
         status: nextStatus, current_turn_started_at: new Date().toISOString(),
       }).eq('id', id)
@@ -226,41 +244,70 @@ export default function Approval() {
       const { data: existingPost } = await supabase
         .from('bulletin_board').select('id').eq('complaint_id', id).maybeSingle()
       if (!existingPost) {
-        await supabase.from('bulletin_board').insert({
-          complaint_id: id,
-          content: {
-            site_name:              complaint.site_name,
-            description:            complaint.content,
-            received_at:            complaint.received_at || complaint.created_at,
-            assignee:               complaint.assignee,
-            contact_logs:           contactLogs.map(l => ({
-              content:           l.content,
-              created_at:        l.created_at,
-              connected_attempt: l.connected_attempt ?? null,
-              missed_calls:      l.missed_calls ?? null,
-            })),
-            hearing:                hearingText,
-            hearing_at:             hearingLog?.created_at ?? null,
-            hearing_author:         hearingLog?.author_name ?? null,
-            correction_action:      correction?.correction,
-            correction_author:      correction?.author_name || complaint.assignee || null,
-            correction_created_at:  correction?.created_at ?? null,
-            direct_cause:           correction?.direct_cause,
-            improvement:            correction?.improvement,
-            root_cause:             analysis?.root_cause,
-            root_theme:             analysis?.root_theme,
-            root_detail:            analysis?.root_detail,
-            org_improvement:        analysis?.org_improvement,
-            action_assignee:        analysis?.action_assignee,
-            action_deadline:        analysis?.action_deadline,
-            action_progress:        analysis?.action_progress,
-            horizontal_departments: analysis?.horizontal_departments,
-            horizontal_content:     analysis?.horizontal_content,
-            deep_author:            analysis?.author_name ?? null,
-            deep_created_at:        analysis?.created_at ?? null,
-            approved_at:            new Date().toISOString(),
-          },
-        })
+        const boardContent = complaint.workflow_version === 2 ? {
+          site_name:              complaint.site_name,
+          description:            complaint.content,
+          received_at:            complaint.received_at || complaint.created_at,
+          assignee:               complaint.assignee,
+          contact_logs:           contactLogs.map(l => ({
+            content:           l.content,
+            created_at:        l.created_at,
+            connected_attempt: l.connected_attempt ?? null,
+            missed_calls:      l.missed_calls ?? null,
+          })),
+          hearing:                hearingText,
+          hearing_at:             hearingLog?.created_at ?? null,
+          hearing_author:         hearingLog?.author_name ?? null,
+          correction_action:      rootAnalysis?.correction,
+          correction_author:      rootAnalysis?.author_name || complaint.assignee || null,
+          correction_created_at:  rootAnalysis?.created_at ?? null,
+          direct_cause:           rootAnalysis?.occurred_event_note,
+          improvement:            rootAnalysis?.improvement,
+          root_cause:             rootAnalysis?.root_cause,
+          root_theme:             rootAnalysis?.root_theme,
+          root_detail:            null,
+          org_improvement:        rootAnalysis?.improvement,
+          action_assignee:        rootAnalysis?.action_assignee,
+          action_deadline:        rootAnalysis?.action_deadline,
+          action_progress:        rootAnalysis?.action_progress,
+          horizontal_departments: rootAnalysis?.horizontal_departments,
+          horizontal_content:     null,
+          deep_author:            rootAnalysis?.author_name ?? null,
+          deep_created_at:        rootAnalysis?.created_at ?? null,
+          approved_at:            new Date().toISOString(),
+        } : {
+          site_name:              complaint.site_name,
+          description:            complaint.content,
+          received_at:            complaint.received_at || complaint.created_at,
+          assignee:               complaint.assignee,
+          contact_logs:           contactLogs.map(l => ({
+            content:           l.content,
+            created_at:        l.created_at,
+            connected_attempt: l.connected_attempt ?? null,
+            missed_calls:      l.missed_calls ?? null,
+          })),
+          hearing:                hearingText,
+          hearing_at:             hearingLog?.created_at ?? null,
+          hearing_author:         hearingLog?.author_name ?? null,
+          correction_action:      correction?.correction,
+          correction_author:      correction?.author_name || complaint.assignee || null,
+          correction_created_at:  correction?.created_at ?? null,
+          direct_cause:           correction?.direct_cause,
+          improvement:            correction?.improvement,
+          root_cause:             analysis?.root_cause,
+          root_theme:             analysis?.root_theme,
+          root_detail:            analysis?.root_detail,
+          org_improvement:        analysis?.org_improvement,
+          action_assignee:        analysis?.action_assignee,
+          action_deadline:        analysis?.action_deadline,
+          action_progress:        analysis?.action_progress,
+          horizontal_departments: analysis?.horizontal_departments,
+          horizontal_content:     analysis?.horizontal_content,
+          deep_author:            analysis?.author_name ?? null,
+          deep_created_at:        analysis?.created_at ?? null,
+          approved_at:            new Date().toISOString(),
+        }
+        await supabase.from('bulletin_board').insert({ complaint_id: id, content: boardContent })
       }
     }
 
@@ -291,7 +338,7 @@ export default function Approval() {
   )
 
   const approvedCount = approvals.filter(a => a.status === 'approved').length
-  const countdown = calcCountdown(analysis?.created_at)
+  const countdown = calcCountdown(complaint.workflow_version === 2 ? rootAnalysis?.created_at : analysis?.created_at)
   const allApproved = approvals.length > 0 && approvals.every(a => a.status === 'approved')
   const totalTheme = Object.values(themeStats).reduce((s, v) => s + v, 0) || 1
   const userRole = getRole(currentUser)
@@ -350,8 +397,8 @@ export default function Approval() {
         </div>
       </div>
 
-      {/* 合同改善報告書プレビュー */}
-      {analysis && (
+      {/* 合同改善報告書プレビュー（workflow_version = 1 の既存フローのみ） */}
+      {complaint.workflow_version !== 2 && analysis && (
         <div className="bg-white rounded-2xl shadow-sm mb-5 overflow-hidden">
           <div className="px-5 py-3.5 border-b border-stone-100 bg-stone-50 flex items-center gap-2">
             <span className="text-sm font-bold text-gray-700">📄 合同改善報告書</span>
@@ -436,8 +483,8 @@ export default function Approval() {
         </div>
       )}
 
-      {/* ① 事業責任者の深掘り結果（読み取り専用） */}
-      {analysis && (
+      {/* ① 事業責任者の深掘り結果（読み取り専用・workflow_version = 1 の既存フローのみ） */}
+      {complaint.workflow_version !== 2 && analysis && (
         <div className="bg-white rounded-2xl shadow-sm mb-5 overflow-hidden">
           <div className="px-5 py-3.5 border-b border-stone-100 bg-stone-50">
             <span className="text-sm font-bold text-gray-700">① 事業責任者の深掘り結果</span>
@@ -453,6 +500,31 @@ export default function Approval() {
                 ROOT_THEME_COLORS[analysis.root_theme] || 'bg-stone-400'
               )}>
                 {analysis.root_theme || '—'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ① 原因分析・改善報告書（読み取り専用・workflow_version = 2 の新フロー専用） */}
+      {complaint.workflow_version === 2 && rootAnalysis && (
+        <div className="bg-white rounded-2xl shadow-sm mb-5 overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-stone-100 bg-stone-50">
+            <span className="text-sm font-bold text-gray-700">① 原因分析・改善報告書</span>
+          </div>
+          <div className="p-5">
+            <ReadRow label="発生した事象" value={rootAnalysis.occurred_event_note} />
+            <ReadRow label="実施した是正措置" value={rootAnalysis.correction} />
+            <ReadRow label="真因" value={rootAnalysis.root_cause} />
+            <ReadRow label="改善策" value={rootAnalysis.improvement} />
+            <ReadRow label="横展開対象部署" value={Array.isArray(rootAnalysis.horizontal_departments) ? rootAnalysis.horizontal_departments.join('・') : ''} />
+            <div>
+              <p className="text-xs font-semibold text-gray-500 mb-1">真因カテゴリー</p>
+              <span className={cn(
+                'inline-block text-xs font-bold px-3 py-1.5 rounded-full text-white',
+                ROOT_THEME_COLORS[rootAnalysis.root_theme] || 'bg-stone-400'
+              )}>
+                {rootAnalysis.root_theme || '—'}
               </span>
             </div>
           </div>
@@ -646,18 +718,29 @@ export default function Approval() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-6 w-80 space-y-4 shadow-xl">
             <p className="font-bold text-gray-800 text-center">差し戻し先を選択してください</p>
-            <button
-              onClick={() => handleApproval(rejectTarget, 'rejected', 'deep_analysis')}
-              className="w-full py-3 rounded-xl bg-stone-100 hover:bg-stone-200 text-sm font-bold text-gray-700 transition-colors"
-            >
-              深掘り分析に戻す
-            </button>
-            <button
-              onClick={() => handleApproval(rejectTarget, 'rejected', 'report')}
-              className="w-full py-3 rounded-xl bg-red-50 hover:bg-red-100 text-sm font-bold text-red-700 transition-colors"
-            >
-              改善報告書に戻す
-            </button>
+            {complaint.workflow_version === 2 ? (
+              <button
+                onClick={() => handleApproval(rejectTarget, 'rejected', 'root_analysis')}
+                className="w-full py-3 rounded-xl bg-stone-100 hover:bg-stone-200 text-sm font-bold text-gray-700 transition-colors"
+              >
+                原因分析・改善報告書に戻す
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => handleApproval(rejectTarget, 'rejected', 'deep_analysis')}
+                  className="w-full py-3 rounded-xl bg-stone-100 hover:bg-stone-200 text-sm font-bold text-gray-700 transition-colors"
+                >
+                  深掘り分析に戻す
+                </button>
+                <button
+                  onClick={() => handleApproval(rejectTarget, 'rejected', 'report')}
+                  className="w-full py-3 rounded-xl bg-red-50 hover:bg-red-100 text-sm font-bold text-red-700 transition-colors"
+                >
+                  改善報告書に戻す
+                </button>
+              </>
+            )}
             <button
               onClick={() => { setRejectModalOpen(false); setRejectTarget(null) }}
               className="w-full py-2 text-xs text-gray-400 hover:text-gray-600"

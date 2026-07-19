@@ -556,6 +556,31 @@ export default function BulletinBoard() {
         if (deepRows) deepRows.forEach(d => { deepMap[d.complaint_id] = d })
       }
 
+      // root_analysis（workflow_version = 2 の新フロー）を一括取得。
+      // deep_analysis に行がない案件（＝新フロー案件）だけ、こちらの内容を同じ表示形に正規化して使う
+      let rootMap = {}
+      if (ids.length > 0) {
+        const { data: rootRows } = await supabase
+          .from('complaint_root_analysis')
+          .select('complaint_id, root_cause, root_theme, improvement, horizontal_departments, action_assignee, action_deadline, action_progress, created_at, author_name')
+          .in('complaint_id', ids)
+        if (rootRows) rootRows.forEach(r => {
+          rootMap[r.complaint_id] = {
+            root_cause:             r.root_cause,
+            root_theme:             r.root_theme,
+            root_detail:            null,
+            org_improvement:        r.improvement,
+            horizontal_departments: r.horizontal_departments,
+            horizontal_content:     null,
+            action_assignee:        r.action_assignee,
+            action_deadline:        r.action_deadline,
+            action_progress:        r.action_progress,
+            created_at:             r.created_at,
+            author_name:            r.author_name,
+          }
+        })
+      }
+
       // 役員否認コメントを一括取得（comment が残っているもののみ）
       let rejectionsMap = {}
       if (ids.length > 0) {
@@ -608,7 +633,7 @@ export default function BulletinBoard() {
 
       setBulletinPosts(posts.map(p => ({
         ...p,
-        deep:       deepMap[p.complaint_id]       ?? null,
+        deep:       deepMap[p.complaint_id] ?? rootMap[p.complaint_id] ?? null,
         rejections: rejectionsMap[p.complaint_id] ?? [],
         negReplies: negReplyMap[p.complaint_id]   ?? [],
         manuals:    manualsMap[p.complaint_id]    ?? [],

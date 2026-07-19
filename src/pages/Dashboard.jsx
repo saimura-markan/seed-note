@@ -21,6 +21,8 @@ const STATUS_TO_STEP = {
   'supervisor_check': 3,
   '深掘り提出':     4,
   '役員再協議':   4,
+  '原因分析提出':     4,
+  '原因分析差し戻し': 4,
   '承認完了':       5,
 }
 
@@ -54,6 +56,8 @@ const STATUS_BADGE = {
   'report_rejected':     'bg-red-100 text-red-700 border border-red-200',
   'supervisor_check':    'bg-blue-100 text-blue-700 border border-blue-200',
   '役員再協議':          'bg-red-100 text-red-700 border border-red-200',
+  '原因分析提出':        'bg-indigo-100 text-indigo-700 border border-indigo-200',
+  '原因分析差し戻し':    'bg-red-100 text-red-700 border border-red-200',
   '承認完了':       'bg-emerald-100 text-emerald-700 border border-emerald-200',
 }
 
@@ -75,7 +79,7 @@ const TAG_COLOR = {
 const STATUS_FILTER_GROUPS = {
   '全て':     null,
   '未対応':   ['受付済', '対応中'],
-  '対応中':   ['是正案提出', '是正案差し戻し', '是正案再提出', '是正案承認', '改善報告書提出', 'correction_rejected', 'report_rejected', 'supervisor_check', '深掘り提出', '役員再協議'],
+  '対応中':   ['是正案提出', '是正案差し戻し', '是正案再提出', '是正案承認', '改善報告書提出', 'correction_rejected', 'report_rejected', 'supervisor_check', '深掘り提出', '役員再協議', '原因分析提出', '原因分析差し戻し'],
   '承認待ち': [],
   '完了':     ['承認完了'],
 }
@@ -83,27 +87,27 @@ const STATUS_FILTERS = Object.keys(STATUS_FILTER_GROUPS)
 
 // 要対応ステータス（role → 通知バッジの対象）
 const ACTIONABLE_STATUSES = {
-  admin:     ['受付済', '対応中', '是正案差し戻し', '是正案承認', 'correction_rejected', 'report_rejected', 'supervisor_check', '深掘り提出', '役員再協議'],
-  manager:   ['受付済', '対応中', '是正案差し戻し', '是正案承認', 'correction_rejected', 'report_rejected', 'supervisor_check', '深掘り提出', '役員再協議'],
-  director:  ['是正案提出', '是正案再提出', 'supervisor_check'],
-  executive: ['深掘り提出'],
+  admin:     ['受付済', '対応中', '是正案差し戻し', '是正案承認', 'correction_rejected', 'report_rejected', 'supervisor_check', '深掘り提出', '役員再協議', '原因分析提出', '原因分析差し戻し'],
+  manager:   ['受付済', '対応中', '是正案差し戻し', '是正案承認', 'correction_rejected', 'report_rejected', 'supervisor_check', '深掘り提出', '役員再協議', '原因分析差し戻し'],
+  director:  ['是正案提出', '是正案再提出', 'supervisor_check', '原因分析差し戻し'],
+  executive: ['深掘り提出', '原因分析提出'],
   judgment:  ['深掘り提出'],
 }
 
 // 自分のターン判定（role → 担当ステータスのSet）
 const MY_TURN_STATUSES = {
-  manager:   new Set(['受付済', '対応中', '是正案差し戻し', '是正案承認', 'correction_rejected', 'report_rejected']),
+  manager:   new Set(['受付済', '対応中', '是正案差し戻し', '是正案承認', 'correction_rejected', 'report_rejected', '原因分析差し戻し']),
   staff:     new Set(['受付済', '対応中', '是正案差し戻し', '是正案承認', 'correction_rejected', 'report_rejected']),
-  director:  new Set(['是正案提出', '是正案再提出', '改善報告書提出', 'supervisor_check', '役員再協議']),
-  executive: new Set(['深掘り提出']),
-  admin:     new Set(['深掘り提出']),
+  director:  new Set(['是正案提出', '是正案再提出', '改善報告書提出', 'supervisor_check', '役員再協議', '原因分析差し戻し']),
+  executive: new Set(['深掘り提出', '原因分析提出']),
+  admin:     new Set(['深掘り提出', '原因分析提出']),
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 // ステータスごとの期限起点と制限時間を返す
 function deadlineInfo(status, receivedAt, currentTurnStartedAt, deadlineMinutes) {
-  if (['受付済', '対応中', '是正案差し戻し', '是正案再提出', '役員再協議'].includes(status)) {
+  if (['受付済', '対応中', '是正案差し戻し', '是正案再提出', '役員再協議', '原因分析差し戻し'].includes(status)) {
     return { startMs: receivedAt, limitMs: deadlineMinutes * 60 * 1000 }
   }
   return { startMs: currentTurnStartedAt ?? receivedAt, limitMs: 24 * 60 * 60 * 1000 }

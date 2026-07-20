@@ -232,11 +232,13 @@ export default function Approval() {
       if (logEntry) setApprovalTimeline(prev => [...prev, logEntry])
     }
 
-    // 全員承認済みなら complaint を完了に
-    const updated = approvals.map(a =>
-      a.id === approvalId ? { ...a, status } : a
-    )
-    if (updated.every(a => a.status === 'approved')) {
+    // 全員承認済みなら complaint を完了に（DBから再取得して判定）
+    const { data: freshApprovals } = await supabase
+      .from('complaint_approvals')
+      .select('status')
+      .eq('complaint_id', id)
+    const allApprovedNow = !!freshApprovals?.length && freshApprovals.every(a => a.status === 'approved')
+    if (allApprovedNow) {
       await supabase.from('complaints').update({ status: '承認完了', current_turn_started_at: new Date().toISOString() }).eq('id', id)
       setComplaint(c => ({ ...c, status: '承認完了' }))
 

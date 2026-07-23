@@ -145,6 +145,7 @@ function mapRow(row) {
     site:                 row.site_name     ?? '',
     tag:                  row.category      ?? '',
     assignee:             row.assignee      ?? '',
+    assigneeUserId:       row.assignee_user_id ?? null,
     worker:               row.worker_name   ?? '',
     deadlineMinutes:      row.deadline_minutes ?? 60,
     receivedAt:           new Date(row.received_at).getTime(),
@@ -562,7 +563,10 @@ export default function Dashboard() {
       return complaints.filter(c =>
         actionableSet.has(c.status) &&
         userDepartment && c.department === userDepartment &&
-        (!displayName || c.assignee.includes(displayName.split(' ')[0]))
+        // 新規案件は assignee_user_id で厳密判定。旧データ（user_id 無し）は従来の氏名部分一致にフォールバック
+        (c.assigneeUserId
+          ? c.assigneeUserId === user.id
+          : (!displayName || c.assignee.includes(displayName.split(' ')[0])))
       ).length
     }
     if (role === 'director') {

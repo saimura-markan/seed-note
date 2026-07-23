@@ -38,7 +38,7 @@ const DEPT_STAFF = {
 const INITIAL_FORM = {
   clientName: '', clientContact: '', siteName: '',
   workerName: '', category: '', content: '',
-  emotionLevel: 3, department: '', assignee: '', director: '', receiverName: '', workDate: '',
+  emotionLevel: 3, department: '', assignee: '', assigneeUserId: '', director: '', directorUserId: '', receiverName: '', workDate: '',
 }
 
 // ─── スタイル定数 ─────────────────────────────────────────────────────────────
@@ -60,6 +60,9 @@ export default function ComplaintNew() {
   const [callStartTime, setCallStartTime] = useState(0)
   const [elapsed, setElapsed]   = useState(0)
 
+  // 担当者・事業責任者の候補（承認済みユーザー）。assignee_user_id / director_user_id の紐付け元
+  const [staffProfiles, setStaffProfiles] = useState([])
+
   // 元請様名サジェスト
   const [suggestions,     setSuggestions]     = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -76,6 +79,16 @@ export default function ComplaintNew() {
     const name = profileName || user?.user_metadata?.full_name
     if (name) set('receiverName', name)
   }, [profileName, user])
+
+  // 担当者・事業責任者の候補を取得（承認済み = seed_note_role が pending 以外）
+  useEffect(() => {
+    supabase
+      .from('profiles')
+      .select('id, name, department, seed_note_role')
+      .neq('seed_note_role', 'pending')
+      .order('name')
+      .then(({ data }) => setStaffProfiles(data ?? []))
+  }, [])
 
   // calling フェーズの経過時間カウントアップ
   useEffect(() => {
@@ -146,6 +159,9 @@ export default function ComplaintNew() {
       response_deadline: new Date(receivedAt.getTime() + deadlineMs).toISOString(),
       department:        form.department,
       assignee:          form.assignee,
+      reporter_user_id:  user.id,
+      assignee_user_id:  form.assigneeUserId || null,
+      director_user_id:  form.directorUserId || null,
       receiver_name:     form.receiverName,
       work_date:         form.workDate || null,
       status:            'calling',
@@ -422,7 +438,13 @@ export default function ComplaintNew() {
                   onChange={e => {
                     const dept = e.target.value
                     const staff = DEPT_STAFF[dept] ?? {}
-                    setForm(f => ({ ...f, department: dept, assignee: staff.manager || '', director: staff.director || '' }))
+                    // DEPT_STAFF は「文字列名」だけプリセット（UX維持）。user_id は名前一致で引かず、
+                    // 担当者/事業責任者プルダウンからの明示選択に委ねる。部署変更時は前の選択をクリア。
+                    setForm(f => ({
+                      ...f, department: dept,
+                      assignee: staff.manager  || '', assigneeUserId: '',
+                      director: staff.director || '', directorUserId: '',
+                    }))
                   }}
                   className={cn(inputCls, !form.department ? 'border-red-200 bg-red-50' : 'bg-white')}>
                   <option value="">選択してください</option>
@@ -433,23 +455,45 @@ export default function ComplaintNew() {
                 <label className={labelCls}>
                   管理者（担当者）
                   {form.department && (
-                    <span className="ml-1.5 text-[10px] font-normal text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">自動入力・変更可</span>
+                    <span className="ml-1.5 text-[10px] font-normal text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">担当者を選択</span>
                   )}
                 </label>
-                <input value={form.assignee} onChange={e => set('assignee', e.target.value)}
-                  className={cn(inputCls, form.department && form.assignee ? 'border-emerald-200 bg-emerald-50' : '')}
-                  placeholder="部署を選択すると自動入力" />
+                <select value={form.assigneeUserId}
+                  onChange={e => {
+                    const p = staffProfiles.find(sp => sp.id === e.target.value)
+                    setForm(f => ({ ...f, assigneeUserId: p?.id || '', assignee: p?.name || '' }))
+                  }}
+                  className={cn(inputCls, form.assigneeUserId ? 'border-emerald-200 bg-emerald-50' : '')}>
+                  <option value="">選択してください</option>
+                  {staffProfiles.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}{p.department ? `（${p.department}）` : ''}</option>
+                  ))}
+                </select>
+                {!form.assigneeUserId && form.assignee && (
+                  <p className="mt-1 text-[10px] text-gray-400">候補: {form.assignee}</p>
+                )}
               </div>
               <div>
                 <label className={labelCls}>
                   事業責任者
                   {form.department && (
-                    <span className="ml-1.5 text-[10px] font-normal text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">自動入力・変更可</span>
+                    <span className="ml-1.5 text-[10px] font-normal text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">責任者を選択</span>
                   )}
                 </label>
-                <input value={form.director} onChange={e => set('director', e.target.value)}
-                  className={cn(inputCls, form.department && form.director ? 'border-emerald-200 bg-emerald-50' : '')}
-                  placeholder="部署を選択すると自動入力" />
+                <select value={form.directorUserId}
+                  onChange={e => {
+                    const p = staffProfiles.find(sp => sp.id === e.target.value)
+                    setForm(f => ({ ...f, directorUserId: p?.id || '', director: p?.name || '' }))
+                  }}
+                  className={cn(inputCls, form.directorUserId ? 'border-emerald-200 bg-emerald-50' : '')}>
+                  <option value="">選択してください</option>
+                  {staffProfiles.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}{p.department ? `（${p.department}）` : ''}</option>
+                  ))}
+                </select>
+                {!form.directorUserId && form.director && (
+                  <p className="mt-1 text-[10px] text-gray-400">候補: {form.director}</p>
+                )}
               </div>
             </div>
             <div>

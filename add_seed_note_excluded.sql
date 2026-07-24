@@ -15,8 +15,8 @@
 --   Seed Note 専用の独立した除外列を設ける。
 --
 -- 対象:
---   インフォ  7893dda8-bee1-4e6f-8cd4-3514ef5db2e4  info@markan.co.jp
---   本部 太郎 85c7d6bb-a4a0-4914-8d8f-66584ff7788c  saimura0314@docomo.ne.jp
+--   インフォ  7893dda8-bee1-4e6f-8cd4-3514ef5db2e4
+--   本部 太郎 85c7d6bb-a4a0-4914-8d8f-66584ff7788c
 --
 -- 冪等性: ADD COLUMN IF NOT EXISTS + id 直指定 UPDATE のため再実行しても安全
 -- 実行順: ① 列追加 → ② 事前確認 → ③ UPDATE → ④ 事後確認
@@ -45,10 +45,8 @@ SELECT
   p.name,
   p.department,
   p.seed_note_role,
-  p.seed_note_excluded,
-  u.email
+  p.seed_note_excluded
 FROM public.profiles p
-LEFT JOIN auth.users u ON u.id = p.id
 WHERE p.id IN (
   '7893dda8-bee1-4e6f-8cd4-3514ef5db2e4',  -- インフォ
   '85c7d6bb-a4a0-4914-8d8f-66584ff7788c'   -- 本部 太郎

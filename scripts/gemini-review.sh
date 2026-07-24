@@ -89,6 +89,24 @@ check_personal_info() {
   log "個人情報チェック: 問題なし ✅"
 }
 
+# diff から追加行(+)のみを抽出する（ファイルヘッダ +++ は除外）
+# 削除行(-)には「消したはずの過去データ」が写り込むため、新規混入だけを
+# 検査したい PII チェックはこの出力を対象にする。
+added_lines() {
+  local content="$1"
+  echo "$content" | grep -E '^\+' | grep -vE '^\+\+\+' || true
+}
+
+# 外部送信前に個人情報（メール・電話番号）をマスクする。
+# 追加行の新規 PII は check_personal_info で既に中止済み。ここでは削除行・
+# 文脈行に残る過去 PII を Gemini へ送らないためにマスクする。
+redact_pii() {
+  local content="$1"
+  echo "$content" \
+    | sed -E 's/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/[REDACTED_EMAIL]/g' \
+    | sed -E 's/0[0-9]{1,4}-[0-9]{2,4}-[0-9]{4}/[REDACTED_PHONE]/g'
+}
+
 # レビュー対象のコードを収集（Git差分のみ）
 collect_review_target() {
   cd "$PROJECT_ROOT"
@@ -199,9 +217,18 @@ main() {
   code=$(collect_review_target)
 
   # 送信前チェック
+  # PII（メール・電話番号）は「追加行」のみを検査する。git diff には削除行(-)
+  # として過去のデータが写り込むため、削除行まで検査すると「消したはずのメール」で
+  # 誤中止する。新規に混入した PII だけを止めたい。
   log "送信前セキュリティチェック実行中..."
-  check_secrets "$code"
-  check_personal_info "$code"
+  local added_only
+  added_only=$(added_lines "$code")
+  check_secrets "$code"              # シークレットは重大度が高いため差分全体を対象に据え置き
+  check_personal_info "$added_only"
+
+  # Gemini へ送るコードは、削除行・文脈行に残る PII をマスクしてから送信する
+  # （追加行の新規 PII は上の check_personal_info で既に中止済み）
+  code=$(redact_pii "$code")
 
   # 差分サマリー（ファイル名のみ）
   local diff_summary

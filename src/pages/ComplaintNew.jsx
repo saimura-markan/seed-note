@@ -80,12 +80,17 @@ export default function ComplaintNew() {
     if (name) set('receiverName', name)
   }, [profileName, user])
 
-  // 担当者・事業責任者の候補を取得（承認済み = seed_note_role が pending 以外）
+  // 担当者・事業責任者の候補を取得
+  // seed_note_excluded: profiles は E-Li / MK Daily と共有のため、他システム経由で
+  //   混入したシステム・テストアカウントが候補に並ぶ。Seed Note 専用の除外フラグで落とす
+  //   （MK Daily の is_active は使わない。両システムでテスト継続中のアカウントがあるため）
+  // seed_note_role: 承認済みロールのホワイトリスト。pending と NULL の両方を落とす
   useEffect(() => {
     supabase
       .from('profiles')
       .select('id, name, department, seed_note_role')
-      .neq('seed_note_role', 'pending')
+      .eq('seed_note_excluded', false)
+      .in('seed_note_role', ['staff', 'manager', 'director', 'executive', 'admin'])
       .order('name')
       .then(({ data }) => setStaffProfiles(data ?? []))
   }, [])
